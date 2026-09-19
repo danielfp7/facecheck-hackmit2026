@@ -61,6 +61,8 @@ struct CorneaState: Codable, Identifiable {
     let sentColor: String
     let sentPosition: String
     let decodedShape: String
+    let decodedPosition: String?
+    let match: Bool?            // position (and shape, when readable) read back correctly
     let score: Double
     let margin: Double
     let cropJpegB64: String
@@ -69,8 +71,10 @@ struct CorneaState: Codable, Identifiable {
 struct CorneaSignal: Codable {
     let ok: Bool
     let reason: String?
+    let shapeReadable: Bool?
     let shapeAccuracy: Double?
     let positionCorr: Double?
+    let distanceMm: Double?
     let colorScore: Double?
     let geometryOk: Bool?
     let reflectionWidthMm: Double?

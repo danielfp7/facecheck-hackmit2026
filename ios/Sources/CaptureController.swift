@@ -138,10 +138,13 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
 
     // MARK: Exposure / focus
 
-    /// Instructed eye-to-phone distance: 3 inches unless the lens can't focus that close.
+    /// Instructed eye-to-phone distance. Closer is much better: the corneal reflection's size
+    /// goes as 1/distance^2. `minimumFocusDistance` is not used as a floor because it is
+    /// conservative (an iPhone 14 Pro reports 200 mm yet is sharp well inside that); the server
+    /// measures the true distance from the iris anyway.
     var workingDistanceMM: Double {
-        guard let mf = device?.minimumFocusDistance, mf > 0 else { return 76 }
-        return max(76, Double(mf) + 10)
+        let inches = UserDefaults.standard.double(forKey: "distanceInches")
+        return (inches > 0 ? inches : 4) * 25.4
     }
 
     /// Back to fully automatic, for the selfie and positioning steps.

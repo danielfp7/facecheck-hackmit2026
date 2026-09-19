@@ -34,7 +34,7 @@ def main():
     ap.add_argument("--label", help="only captures with this label")
     ap.add_argument("--set-baseline", action="store_true",
                     help="write median lag of 'real' captures per device model to baselines.json")
-    ap.add_argument("--shape-mode", default="shape", choices=["shape", "layout"])
+    ap.add_argument("--shape-mode", default="auto", choices=["auto", "shape", "layout"])
     args = ap.parse_args()
 
     rows = []

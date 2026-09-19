@@ -88,6 +88,7 @@ struct HomeView: View {
 struct SettingsView: View {
     @AppStorage("serverURL") private var serverURL = Flow.defaultServerURL
     @AppStorage("userName") private var userName = "daniel"
+    @AppStorage("distanceInches") private var distanceInches = 4.0
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -100,6 +101,11 @@ struct SettingsView: View {
                 Section("Username") {
                     TextField("username", text: $userName)
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
+                }
+                Section("Eye distance") {
+                    Stepper("\(Int(distanceInches)) inches", value: $distanceInches, in: 2...8, step: 1)
+                    Text("Closer makes the reflection in the eye bigger and easier to read, as long as the camera still focuses.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {
                     Text("For reliable results turn off Auto-Brightness, True Tone, Night Shift and Low Power Mode.")

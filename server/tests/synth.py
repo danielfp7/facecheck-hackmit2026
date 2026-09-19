@@ -18,7 +18,7 @@ from render import render_state, render_color
 W, H, FPS = 720, 1280, 60
 SKIN = np.array([0.85, 0.58, 0.47])
 IRIS = np.array([0.18, 0.11, 0.07])
-AMBIENT = 0.10
+AMBIENT = 0.35              # bright room, like the real captures
 SCREEN_GAIN = 0.55
 GLINT_W, GLINT_H = 40, 52   # px: ~3.4 x 4.5 mm corneal image at 1080p-ish scale
 EYE_C = (380, 560)

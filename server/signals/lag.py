@@ -125,8 +125,11 @@ def analyze(bundle: Bundle, ch: Challenge) -> dict:
             sent.append(_state_rgb(ch, si))
     diff_score = None
     if len(plateaus) >= 3:
-        dm = np.diff(np.array(plateaus), axis=0) / np.maximum(gains, 1e-6)
-        de = np.diff(np.array(sent), axis=0)
+        # Compare against the sent differences as the skin would show them (per-channel
+        # gain applied). Dividing the measurement by the gains instead would blow up
+        # noise in a channel the screen barely drives, such as blue.
+        dm = np.diff(np.array(plateaus), axis=0)
+        de = np.diff(np.array(sent), axis=0) * gains
         keep = np.linalg.norm(de, axis=1) > 1e-3
         num = (dm[keep] * de[keep]).sum(axis=1)
         den = np.linalg.norm(dm[keep], axis=1) * np.linalg.norm(de[keep], axis=1) + 1e-12

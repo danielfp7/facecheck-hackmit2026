@@ -63,9 +63,11 @@ def test_unresponsive_video_has_no_response(cases, ch):
 def test_cornea_reads_shapes(cases, ch):
     l = lag.analyze(cases["real"], ch)
     r = cornea.analyze(cases["real"], ch, l["lag_ms"])
-    assert r["ok"] and r["geometry_ok"]
-    assert r["shape_accuracy"] >= 0.85
+    assert r["ok"] and r["geometry_ok"] and r["inside_iris"]
+    assert r["shape_readable"] and r["shape_accuracy"] >= 0.85
     assert r["position_corr"] > 0.8 and r["color_score"] > 0.8
+    # The iris fit doubles as a ruler: synth draws a 70 px iris radius.
+    assert abs(r["iris_radius_px"] - synth.IRIS_R) < 6
 
 
 def test_flat_mirror_fails_geometry(cases, ch):
@@ -78,7 +80,7 @@ def test_flat_mirror_fails_geometry(cases, ch):
     ("real", "verified", "live human"),
     ("delayed", "unverified", "delayed"),
     ("dead", "unverified", "no light response"),
-    ("flat", "unverified", "too large"),
+    ("flat", "unverified", ""),
     ("noglint", "unverified", ""),
 ])
 def test_verdicts(cases, ch, name, expected, needle):

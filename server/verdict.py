@@ -20,7 +20,7 @@ THRESHOLDS = {
     "lag_margin_ms": 100.0,
     "lag_default_baseline_ms": 70.0,
     "shape_accuracy_min": 0.6,    # chance is 0.33 with three shapes
-    "position_corr_min": 0.5,
+    "position_corr_min": 0.7,
     "color_score_min": 0.5,
     "face_similarity_min": 0.35,
     "max_dropped_frames": 6,
@@ -39,9 +39,9 @@ def _tile(name: str, status: str, headline: str, detail: str = "") -> dict:
     return {"name": name, "status": status, "headline": headline, "detail": detail}
 
 
-def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str = "shape") -> dict:
-    """shape_mode: 'shape' scores the outline; 'layout' scores position + color only
-    (fixed-focus front cameras can't resolve the outline at close range)."""
+def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str = "auto") -> dict:
+    """shape_mode: 'auto' scores the outline only when the reflection is large enough to
+    read it; 'shape' always does; 'layout' never does (position + color only)."""
     T = THRESHOLDS
     tiles, failures, unverifiable = [], [], []
 
@@ -72,24 +72,36 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
 
     # Corneal reflection
     if not cornea.get("ok"):
-        failures.append(cornea.get("reason", "no eye reflection found"))
-        tiles.append(_tile("Eye reflection", "red", "Not found", cornea.get("reason", "")))
+        why = cornea.get("reason", "no eye reflection found")
+        if why == "no eye reflection found":
+            why += " (hold the phone closer, with one eye in the outline)"
+        failures.append(why)
+        tiles.append(_tile("Eye reflection", "red", "Not found", why))
     else:
-        shape_ok = shape_mode == "layout" or cornea["shape_accuracy"] >= T["shape_accuracy_min"]
+        # The outline only counts when the reflection spans enough pixels to read it;
+        # position and color always count.
+        use_shape = shape_mode == "shape" or (shape_mode == "auto" and cornea.get("shape_readable"))
+        shape_ok = not use_shape or (cornea.get("shape_accuracy") or 0) >= T["shape_accuracy_min"]
         pos_ok = cornea["position_corr"] >= T["position_corr_min"]
         col_ok = cornea["color_score"] >= T["color_score_min"]
+        summary = f"position {cornea['position_corr']:.2f}, color {cornea['color_score']:.2f}"
+        if use_shape:
+            summary = f"shapes {(cornea.get('shape_accuracy') or 0):.0%}, " + summary
+        where = f"{cornea['reflection_width_mm']:.1f} mm wide at {cornea['distance_mm']:.0f} mm"
         if not cornea["geometry_ok"]:
-            failures.append(f"reflection is {cornea['size_ratio']:.0f}x too large for a cornea (flat screen or print)")
+            if not cornea.get("inside_iris", True):
+                failures.append("the reflection is not inside an iris")
+            else:
+                failures.append(f"reflection is {cornea['size_ratio']:.1f}x the size a cornea would give (flat screen or print)")
             tiles.append(_tile("Eye reflection", "red", "Not an eye",
-                               f"{cornea['reflection_width_mm']:.1f} mm wide, cornea gives ~3.4 mm"))
+                               f"{where}; a cornea gives ~{cornea['expected_width_mm']:.1f} mm"))
         elif not (shape_ok and pos_ok and col_ok):
             what = [n for n, ok in (("shape", shape_ok), ("position", pos_ok), ("color", col_ok)) if not ok]
             failures.append("eye reflection does not match the displayed " + "/".join(what))
-            tiles.append(_tile("Eye reflection", "red", "Mismatch",
-                               f"shapes {cornea['shape_accuracy']:.0%}, position {cornea['position_corr']:.2f}, color {cornea['color_score']:.2f}"))
+            tiles.append(_tile("Eye reflection", "red", "Mismatch", summary))
         else:
-            tiles.append(_tile("Eye reflection", "green", f"Shapes {cornea['shape_accuracy']:.0%}",
-                               f"position {cornea['position_corr']:.2f}, color {cornea['color_score']:.2f}"))
+            head = f"{cornea['position_accuracy']:.0%} of positions read"
+            tiles.append(_tile("Eye reflection", "green", head, f"{summary}; {where}"))
 
     # Identity
     if identity.get("similarity") is None:

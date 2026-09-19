@@ -148,13 +148,17 @@ struct EyeReflectionGrid: View {
                     HStack(spacing: 4) {
                         Image(systemName: symbol(s.sentShape))
                             .foregroundStyle(s.sentColor == "green" ? Color.green : Color.orange)
-                        Image(systemName: s.decodedShape == s.sentShape ? "checkmark" : "xmark")
-                            .foregroundStyle(s.decodedShape == s.sentShape ? Color.green : Color.red)
-                        Text(String(format: "%.2f", s.score)).font(.caption2).foregroundStyle(.secondary)
+                        Text(s.sentPosition).font(.caption2).foregroundStyle(.secondary)
+                        Image(systemName: matched(s) ? "checkmark" : "xmark")
+                            .foregroundStyle(matched(s) ? Color.green : Color.red)
                     }
                 }
             }
         }
+    }
+
+    private func matched(_ s: CorneaState) -> Bool {
+        s.match ?? (s.decodedShape == s.sentShape)
     }
 
     private func symbol(_ shape: String) -> String {

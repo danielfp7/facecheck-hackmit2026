@@ -29,8 +29,8 @@ WEB = ROOT.parent / "web"
 for d in (USERS, CAPTURES):
     d.mkdir(parents=True, exist_ok=True)
 
-# 'shape' scores the outline in the eye; 'layout' scores position + color only.
-SHAPE_MODE = os.environ.get("INHUMAN_SHAPE_MODE", "shape")
+# 'auto' scores the outline when the reflection is big enough to read; 'shape' always; 'layout' never.
+SHAPE_MODE = os.environ.get("INHUMAN_SHAPE_MODE", "auto")
 CHALLENGE_TTL_S = 90
 
 app = FastAPI(title="InHuman")

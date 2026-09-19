@@ -1,10 +1,18 @@
-"""Check 2: is the displayed shape and color mirrored in the cornea?
+"""Check 2: is the displayed shape, position and color mirrored in the cornea?
 
-A cornea is a ~7.8 mm-radius convex mirror, so it shows a minified, left-right
-flipped image of the screen. Diffuse surfaces (skin, a matte print) only follow
-the *amount* of light; a specular surface follows *where* on the screen the light
-is. That difference is how the eye is found without face landmarks, which don't
-work when only one eye is in frame.
+A cornea is a ~7.8 mm-radius convex mirror, so it shows a tiny, left-right flipped
+image of the screen sitting inside the dark iris. The pipeline:
+
+1. Find the eye: in every shape state, look for a small bright blob of the displayed
+   color on a dark background. Only an eye produces one in the same neighbourhood in
+   every state (face landmarks don't work this close; the face is cropped).
+2. Fit the iris around it. Irises are ~11.7 mm across in everyone, so the fit doubles
+   as a ruler: it gives px/mm at the eye and therefore the true distance.
+3. Register every state to the iris (the eye drifts more between states than the
+   distances being measured), then read the reflection's position, color and, when
+   it spans enough pixels, its outline.
+4. Geometry: the reflection must sit inside the iris and be cornea-sized. A flat
+   screen or a print reflects at a completely different scale.
 """
 from __future__ import annotations
 
@@ -18,18 +26,18 @@ from challenge import Challenge, COLORS, SHAPES, SHAPE_SPAN
 from render import shape_mask, POSITION_Y
 
 CORNEA_FOCAL_MM = 3.9          # R/2 for a 7.8 mm cornea
-LOCALIZE_W = 540
-SCALES = np.linspace(0.55, 1.7, 9)
-ASPECTS = (0.65, 0.8, 1.0)     # off-axis compression of the reflection's height
+IRIS_DIAMETER_MM = 11.7
+LOCALIZE_W = 1080              # localisation runs at this width at most
+DRIFT_PX = 50                  # eye drift tolerated between states, at LOCALIZE_W scale
+CROP_HALF = 260                # eye crop half-size, at LOCALIZE_W scale
+MIN_READABLE_SPAN_PX = 18      # below this the outline can't be told apart; score layout only
+SCALES = np.linspace(0.6, 1.6, 8)
+ASPECTS = (0.7, 0.85, 1.0)     # off-axis compression of the reflection's height
+LUMA = np.array([0.299, 0.587, 0.114], np.float32)
 
 
-def expected_glint_px(meta: dict, frame_w: int) -> tuple[float, float]:
-    """(expected reflection width in source px, px per mm at the eye)."""
-    d = float(meta.get("distance_mm", 76))
-    fov = np.deg2rad(float(meta["camera"].get("fov_deg", 80)))
-    px_per_mm = frame_w / (2 * d * np.tan(fov / 2))
-    mag = CORNEA_FOCAL_MM / (d + CORNEA_FOCAL_MM)
-    return float(meta["screen"].get("width_mm", 70)) * mag * px_per_mm, px_per_mm
+def _blur(img: np.ndarray, sigma: float) -> np.ndarray:
+    return cv2.GaussianBlur(img, (0, 0), sigma)
 
 
 def _assign(ts: np.ndarray, events, ch: Challenge, lag_s: float, guard: float) -> np.ndarray:
@@ -52,12 +60,13 @@ def _state_means(video_path, assign: np.ndarray, width: int | None = None,
         ok, frame = cap.read()
         if not ok:
             break
+        si = int(si)
         if si == -2:
             continue
         if box is not None:
             x, y, w, h = box
             frame = frame[y:y + h, x:x + w]
-        elif width is not None:
+        elif width is not None and width != frame.shape[1]:
             hh = round(frame.shape[0] * width / frame.shape[1])
             frame = cv2.resize(frame, (width, hh), interpolation=cv2.INTER_AREA)
         f = frame[:, :, ::-1].astype(np.float32) / 255.0
@@ -71,165 +80,299 @@ def _state_means(video_path, assign: np.ndarray, width: int | None = None,
     return {si: acc[si] / cnt[si] for si in acc}
 
 
-def _highpass(img: np.ndarray, sigma: float) -> np.ndarray:
-    return img - cv2.GaussianBlur(img, (0, 0), sigma)
+def _lit_color(state) -> np.ndarray:
+    fg = np.array(COLORS[state.shape_color if state.shape_color != "black" else state.background], np.float32)
+    return fg / max(float(fg.sum()), 1.0)
 
 
-def localize(means: dict[int, np.ndarray], glint_px: float) -> dict:
-    """Find where the image changes with the screen's *layout*, not just its level."""
-    keys = sorted(means)
-    lum = np.stack([means[k][:, :, :2].sum(axis=2) for k in keys])       # R+G, (K, h, w)
-    hp = np.stack([_highpass(l, max(glint_px, 2.0)) for l in lum])
-    level = lum.mean(axis=(1, 2))                                         # (K,)
-    # Per-pixel fit hp = a + b*level; what's left is layout-dependent (specular).
-    lc = level - level.mean()
-    b = (hp * lc[:, None, None]).sum(axis=0) / max((lc ** 2).sum(), 1e-9)
-    resid = hp - hp.mean(axis=0) - b[None] * lc[:, None, None]
-    energy = cv2.GaussianBlur((resid ** 2).sum(axis=0), (0, 0), max(glint_px / 2, 1.5))
+def _nearest_black(ch: Challenge, means: dict, idx: int) -> int | None:
+    blacks = [s.index for s in ch.states if s.shape is None and s.index in means]
+    return min(blacks, key=lambda b: abs(b - idx)) if blacks else None
 
-    peak = float(energy.max())
-    floor = float(np.median(energy)) + 1e-12
-    py, px = np.unravel_index(int(np.argmax(energy)), energy.shape)
-    blob = (energy > floor + 0.35 * (peak - floor)).astype(np.uint8)
-    n, labels, stats, _ = cv2.connectedComponentsWithStats(blob)
-    lab = labels[py, px]
-    x, y, w, h = stats[lab, :4] if lab > 0 else (px, py, 1, 1)
-    return {"center": (int(px), int(py)), "bbox": (int(x), int(y), int(w), int(h)),
-            "contrast": peak / floor}
+
+def _glint_response(lit: np.ndarray, black: np.ndarray, state, scale: float) -> tuple[np.ndarray, np.ndarray]:
+    """(score map, lit-color increment D). High where a compact blob of the displayed
+    color appears on a dark background; smooth skin shading and bright skin score ~0."""
+    D = np.clip((lit - black) @ _lit_color(state), 0, None)
+    s = scale
+    dog = np.maximum(_blur(D, 3 * s) - _blur(D, 7.5 * s), _blur(D, 8 * s) - _blur(D, 20 * s))
+    base = _blur(black @ LUMA, 12 * s)
+    dark = np.clip(1 - base / 0.45, 0, 1)
+    return np.clip(dog, 0, None) * dark, D
+
+
+def _kasa(P: np.ndarray) -> tuple[float, float, float]:
+    A = np.c_[2 * P[:, 0], 2 * P[:, 1], np.ones(len(P))]
+    (a, c, d), *_ = np.linalg.lstsq(A, (P ** 2).sum(axis=1), rcond=None)
+    return float(a), float(c), float(np.sqrt(max(d + a * a + c * c, 1e-9)))
+
+
+def fit_iris(gray: np.ndarray, seed: tuple[float, float], rmin: float, rmax: float):
+    """Circle through the iris/sclera edge, from rays cast over the lower arc only
+    (the upper lid hides the top). Returns (cx, cy, r) or None."""
+    g = _blur(gray, 2.5)
+    h, w = g.shape
+    cx, cy = seed
+    fit = None
+    for _ in range(3):
+        pts = []
+        for ang in np.deg2rad(np.arange(-25, 206, 6)):
+            r = np.arange(rmin, rmax)
+            xs, ys = cx + r * np.cos(ang), cy + r * np.sin(ang)   # image y points down
+            ok = (xs >= 1) & (xs < w - 1) & (ys >= 1) & (ys < h - 1)
+            if ok.sum() < 12:
+                continue
+            grad = np.gradient(g[ys[ok].astype(int), xs[ok].astype(int)])
+            if grad.max() <= 0:
+                continue
+            k = int(np.argmax(grad >= 0.6 * grad.max()))          # first strong dark->bright edge
+            pts.append((xs[ok][k], ys[ok][k]))
+        if len(pts) < 12:
+            return fit
+        P = np.array(pts)
+        for _ in range(3):                                         # trim outliers
+            a, c, rad = _kasa(P)
+            err = np.abs(np.hypot(P[:, 0] - a, P[:, 1] - c) - rad)
+            keep = err <= max(2.0, np.percentile(err, 75))
+            if keep.sum() < 10:
+                break
+            P = P[keep]
+        a, c, rad = _kasa(P)
+        err = np.abs(np.hypot(P[:, 0] - a, P[:, 1] - c) - rad)
+        if not (rmin <= rad <= rmax) or np.median(err) > 0.08 * rad:
+            return fit
+        fit = (a, c, rad)
+        cx, cy = a, c
+    if fit is None:
+        return None
+    # An iris is darker than what surrounds it.
+    a, c, rad = fit
+    yy, xx = np.mgrid[0:h, 0:w]
+    rr = np.hypot(xx - a, yy - c)
+    lower = yy > c                                                  # ignore the lid/lash side
+    inside = g[(rr < 0.8 * rad) & lower]
+    ring = g[(rr > 1.15 * rad) & (rr < 1.6 * rad) & lower]
+    if len(inside) < 20 or len(ring) < 20 or np.median(inside) > 0.8 * np.median(ring):
+        return None
+    return fit
 
 
 def _templates(span_px: float):
-    """Shape-only templates (mirror image is symmetric for all three shapes)."""
     out = []
     for s in SCALES:
         for a in ASPECTS:
             w = max(6, round(span_px * s))
-            h = max(6, round(span_px * s * a))
-            pad = max(2, round(0.2 * w))
+            pad = max(2, round(0.25 * w))
             for shape in SHAPES:
-                # Render on a square "screen" so the shape fills SHAPE_SPAN of it, then squash.
                 side = round(w / SHAPE_SPAN)
                 m = shape_mask(shape, "middle", side, side).astype(np.float32)
                 ys, xs = np.where(m > 0)
                 m = m[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
-                m = cv2.resize(m, (w, max(4, round(m.shape[0] * h / m.shape[1]))), interpolation=cv2.INTER_AREA)
-                m = cv2.copyMakeBorder(m, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=0)
-                out.append((shape, s, a, m))
+                m = cv2.resize(m, (w, max(4, round(m.shape[0] * a * w / m.shape[1]))), interpolation=cv2.INTER_AREA)
+                out.append((shape, cv2.copyMakeBorder(m, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=0)))
     return out
 
 
-def _jpeg_b64(rgb: np.ndarray, scale: int = 3) -> str:
+def _jpeg_b64(rgb: np.ndarray, size: int = 220) -> str:
     img = np.clip(rgb, 0, None)
-    img = img / max(float(np.percentile(img, 99.5)), 1e-6)
+    img = img / max(float(np.percentile(img, 99.7)), 1e-6)
     img = (np.clip(img, 0, 1) * 255).astype(np.uint8)
-    img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-    ok, buf = cv2.imencode(".jpg", img[:, :, ::-1], [cv2.IMWRITE_JPEG_QUALITY, 90])
+    img = cv2.resize(img, (size, size), interpolation=cv2.INTER_CUBIC)
+    _, buf = cv2.imencode(".jpg", img[:, :, ::-1], [cv2.IMWRITE_JPEG_QUALITY, 88])
     return base64.b64encode(buf.tobytes()).decode()
+
+
+def _shift_crop(img: np.ndarray, cx: float, cy: float, half: int) -> np.ndarray:
+    """Square crop centred on (cx, cy) with sub-pixel accuracy."""
+    M = np.float32([[1, 0, half - cx], [0, 1, half - cy]])
+    return cv2.warpAffine(img, M, (2 * half, 2 * half), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
 
 
 def analyze(bundle: Bundle, ch: Challenge, lag_ms: float) -> dict:
     W, H = bundle.full_size
-    glint_px, px_per_mm = expected_glint_px(bundle.meta, W)
+    meta = bundle.meta
     events = bundle.events()
     assign = _assign(bundle.ts, events, ch, lag_ms / 1000.0, guard=1.5 * bundle.frame_period)
+    shape_states = [s for s in ch.states if s.shape is not None]
 
-    # Pass A: find the eye on reduced frames.
-    k = LOCALIZE_W / W
-    means_small = _state_means(bundle.video_path, assign, width=LOCALIZE_W)
-    if len(means_small) < 4:
+    # ---- 1. find the eye on frames at most LOCALIZE_W wide
+    lw = min(W, LOCALIZE_W)
+    k = lw / W
+    means = _state_means(bundle.video_path, assign, width=lw)
+    usable = [s for s in shape_states if s.index in means and _nearest_black(ch, means, s.index) is not None]
+    if len(usable) < 4:
         return {"ok": False, "reason": "too few usable states"}
-    loc = localize(means_small, glint_px * k)
-    if loc["contrast"] < 6.0:
-        return {"ok": False, "reason": "no eye reflection found", "contrast": round(loc["contrast"], 1)}
 
-    # Geometry: a cornea minifies the screen; flat glass or a print does not.
-    bx, by, bw, bh = loc["bbox"]
-    measured_w_px = bw / k
-    size_ratio = measured_w_px / glint_px
-    geometry_ok = 0.35 <= size_ratio <= 2.5
+    R = DRIFT_PX
+    acc = None
+    responses = {}
+    for s in usable:
+        score, _ = _glint_response(means[s.index], means[_nearest_black(ch, means, s.index)], s, 1.0)
+        responses[s.index] = score
+        spread = cv2.dilate(np.sqrt(score), np.ones((2 * R + 1, 2 * R + 1), np.uint8))
+        acc = spread if acc is None else acc + spread
+    py, px = np.unravel_index(int(np.argmax(acc)), acc.shape)
 
-    # Pass B: full-resolution crop around the reflection.
-    half = int(max(2.2 * glint_px, 40))
-    cx, cy = round(loc["center"][0] / k), round(loc["center"][1] / k)
+    found, glints = 0, []
+    for s in usable:
+        score = responses[s.index]
+        y0, x0 = max(py - R, 0), max(px - R, 0)
+        win = score[y0:py + R + 1, x0:px + R + 1]
+        wy, wx = np.unravel_index(int(np.argmax(win)), win.shape)
+        glints.append((x0 + wx, y0 + wy))
+        if win.max() > 3.0 * (np.percentile(score, 99.9) + 1e-9):
+            found += 1
+    if found < max(3, len(usable) // 2):
+        return {"ok": False, "reason": "no eye reflection found", "states_with_reflection": found}
+    ex, ey = np.median(np.array(glints), axis=0)      # eye position at LOCALIZE_W scale
+
+    # ---- 2. full-resolution eye crops
+    half = int(round(CROP_HALF / k))
+    cx, cy = int(round(ex / k)), int(round(ey / k))
     x0, y0 = max(0, cx - half), max(0, cy - half)
     x1, y1 = min(W, cx + half), min(H, cy + half)
-    box = (x0, y0, x1 - x0, y1 - y0)
-    means = _state_means(bundle.video_path, assign, box=box)
+    if k < 1:
+        crops = _state_means(bundle.video_path, assign, box=(x0, y0, x1 - x0, y1 - y0))
+    else:
+        crops = {si: m[y0:y1, x0:x1] for si, m in means.items()}
+    del means
+    seed = (cx - x0, cy - y0)
+    fs = 1.0 / k                                      # px scale relative to LOCALIZE_W
 
-    blacks = [means[s.index] for s in ch.states if s.shape is None and s.index in means]
-    black = np.mean(blacks, axis=0) if blacks else np.zeros_like(next(iter(means.values())))
+    ref_idx = _nearest_black(ch, crops, usable[len(usable) // 2].index)
+    ref = crops[ref_idx]
+    ref_gray = (ref @ LUMA).astype(np.float32)
 
-    span_px = SHAPE_SPAN * glint_px
-    temps = _templates(span_px)
-    per_state = []
-    for s in ch.states:
-        if s.shape is None or s.index not in means:
-            continue
-        d = means[s.index] - black
-        fg = np.array(COLORS[s.shape_color if s.shape_color != "black" else s.background], np.float32)
-        chan = d @ (fg / max(fg.sum(), 1))          # project on the lit color
-        if s.shape_color == "black":
-            chan = -chan                             # inverse polarity: dark shape on lit screen
-        hp = _highpass(chan.astype(np.float32), glint_px)
+    # Glint per state, in crop coordinates.
+    per = []
+    for s in usable:
+        score, D = _glint_response(crops[s.index], crops[_nearest_black(ch, crops, s.index)], s, fs)
+        r = int(R * fs)
+        ya, xa = max(int(seed[1]) - r, 0), max(int(seed[0]) - r, 0)
+        win = score[ya:int(seed[1]) + r + 1, xa:int(seed[0]) + r + 1]
+        wy, wx = np.unravel_index(int(np.argmax(win)), win.shape)
+        gx, gy = xa + wx, ya + wy
+        q = int(round(10 * fs))
+        patch = D[max(gy - q, 0):gy + q + 1, max(gx - q, 0):gx + q + 1]
+        blob = patch >= 0.5 * patch.max() if patch.max() > 0 else np.zeros_like(patch, bool)
+        yy, xx = np.nonzero(blob)
+        wts = patch[blob]
+        sx = gx - min(q, gx) + float((xx * wts).sum() / wts.sum()) if len(wts) else float(gx)
+        sy = gy - min(q, gy) + float((yy * wts).sum() / wts.sum()) if len(wts) else float(gy)
+        diameter = 2.0 * np.sqrt(blob.sum() / np.pi)
+        rgb_patch = (crops[s.index] - crops[_nearest_black(ch, crops, s.index)])[max(gy - q, 0):gy + q + 1, max(gx - q, 0):gx + q + 1]
+        rgb = rgb_patch[blob].mean(axis=0) if blob.any() else np.zeros(3)
+        per.append({"s": s, "g": (sx, sy), "diameter": float(diameter), "rgb": rgb, "D": D})
 
-        best: dict[str, tuple[float, tuple[int, int], np.ndarray]] = {}
-        for shape, _, _, m in temps:
-            if m.shape[0] >= hp.shape[0] or m.shape[1] >= hp.shape[1]:
-                continue
-            res = cv2.matchTemplate(hp, m, cv2.TM_CCOEFF_NORMED)
-            _, v, _, p = cv2.minMaxLoc(res)
-            if shape not in best or v > best[shape][0]:
-                best[shape] = (float(v), p, m)
-        if len(best) < 3:
-            continue
-        decoded = max(best, key=lambda q: best[q][0])
-        v_true = best[s.shape][0]
-        v_other = max(v for q, (v, _, _) in best.items() if q != s.shape)
-        _, (mx, my), m = best[decoded]
-        mask = m > 0.5
-        region = d[my:my + m.shape[0], mx:mx + m.shape[1]]
-        rgb = region[mask].mean(axis=0) if mask.any() else np.zeros(3)
-        per_state.append({
+    # Coarse size check before anything else: flat glass or a print reflects far too large.
+    seed_med = np.median(np.array([p["g"] for p in per]), axis=0)
+    iris = fit_iris(ref_gray, (float(seed_med[0]), float(seed_med[1])), rmin=18 * fs, rmax=140 * fs)
+
+    fov = np.deg2rad(float(meta["camera"].get("fov_deg", 46)))
+    if iris is not None:
+        px_per_mm = 2 * iris[2] / IRIS_DIAMETER_MM
+        distance_mm = W / (2 * px_per_mm * np.tan(fov / 2))
+    else:
+        distance_mm = float(meta.get("distance_mm", 120))
+        px_per_mm = W / (2 * distance_mm * np.tan(fov / 2))
+    mag = CORNEA_FOCAL_MM / (distance_mm + CORNEA_FOCAL_MM)
+    span_px = SHAPE_SPAN * float(meta["screen"].get("width_mm", 65)) * mag * px_per_mm
+    measured_px = float(np.median([p["diameter"] for p in per]))
+    # Blur and pixelation put a floor of a few px under any measured blob.
+    size_ratio = measured_px / max(span_px, 4.0 * fs)
+
+    if iris is None:
+        reason = ("reflection is far too large for a cornea (flat screen or print)" if size_ratio > 4
+                  else "found a reflection but no iris around it")
+        return {"ok": False, "reason": reason, "size_ratio": round(size_ratio, 2), "geometry_ok": False}
+
+    # ---- 3. register every state to the reference iris
+    icx, icy, ir = iris
+    T = int(min(1.5 * ir, min(ref_gray.shape) / 2 - 12 * fs))
+    tx, ty = int(round(icx)), int(round(icy))
+    tx = int(np.clip(tx, T, ref_gray.shape[1] - T))
+    ty = int(np.clip(ty, T, ref_gray.shape[0] - T))
+    tmpl = ref_gray[ty - T:ty + T, tx - T:tx + T]
+    states_out, us, vs = [], [], []
+    temps = _templates(span_px) if span_px >= MIN_READABLE_SPAN_PX else []
+    for p in per:
+        s = p["s"]
+        gray = (crops[s.index] @ LUMA).astype(np.float32)
+        res = cv2.matchTemplate(gray, tmpl, cv2.TM_CCOEFF_NORMED)
+        _, _, _, loc = cv2.minMaxLoc(res)
+        ox, oy = loc[0] - (tx - T), loc[1] - (ty - T)          # how far the eye moved vs reference
+        u = (p["g"][0] - ox - icx) / ir                          # reflection position in iris radii
+        v = (p["g"][1] - oy - icy) / ir
+        us.append(u); vs.append(v)
+
+        decoded_shape, score, margin = None, None, None
+        if temps:
+            q = int(round(1.2 * span_px))
+            view = _shift_crop(p["D"], p["g"][0], p["g"][1], q)
+            view = view - _blur(view, span_px)
+            best: dict[str, float] = {}
+            for shape, m in temps:
+                if m.shape[0] >= view.shape[0] or m.shape[1] >= view.shape[1]:
+                    continue
+                val = float(cv2.matchTemplate(view, m, cv2.TM_CCOEFF_NORMED).max())
+                best[shape] = max(best.get(shape, -1.0), val)
+            if len(best) == 3:
+                decoded_shape = max(best, key=best.get)
+                score = best[s.shape]
+                margin = score - max(val for q_, val in best.items() if q_ != s.shape)
+
+        view_half = int(round(1.35 * ir))
+        states_out.append({
             "state": s.index, "sent_shape": s.shape, "sent_color": s.shape_color,
-            "sent_position": s.position, "decoded_shape": decoded,
-            "score": round(v_true, 3), "margin": round(v_true - v_other, 3),
-            "y": my + m.shape[0] / 2, "rgb": rgb,
-            "crop_jpeg_b64": _jpeg_b64(means[s.index]),
+            "sent_position": s.position, "decoded_shape": decoded_shape or "?",
+            "score": round(score, 3) if score is not None else 0.0,
+            "margin": round(margin, 3) if margin is not None else 0.0,
+            "u": round(float(u), 3), "v": round(float(v), 3),
+            "crop_jpeg_b64": _jpeg_b64(_shift_crop(crops[s.index], icx + ox, icy + oy, view_half)),
         })
 
-    if len(per_state) < 3:
-        return {"ok": False, "reason": "reflection too small or blurred to read"}
+    us, vs = np.array(us), np.array(vs)
+    sent_y = np.array([POSITION_Y[p["s"].position] for p in per])
+    position_corr = float(np.corrcoef(vs, sent_y)[0, 1]) if np.ptp(sent_y) > 0 and np.ptp(vs) > 1e-6 else 0.0
+    # Decode each state's level from the fitted line, for the results tile.
+    if np.ptp(sent_y) > 0:
+        slope, icpt = np.polyfit(sent_y, vs, 1)
+        levels = {name: icpt + slope * y for name, y in POSITION_Y.items()}
+        for so, v in zip(states_out, vs):
+            so["decoded_position"] = min(levels, key=lambda n: abs(levels[n] - v))
+    shape_readable = bool(temps) and all(so["decoded_shape"] != "?" for so in states_out)
+    shape_acc = float(np.mean([so["decoded_shape"] == so["sent_shape"] for so in states_out])) if shape_readable else None
+    for so in states_out:
+        ok_pos = so.get("decoded_position") == so["sent_position"]
+        so["match"] = bool(ok_pos and (not shape_readable or so["decoded_shape"] == so["sent_shape"]))
 
-    shape_acc = float(np.mean([p["decoded_shape"] == p["sent_shape"] for p in per_state]))
-    shape_margin = float(np.mean([p["margin"] for p in per_state]))
-
-    # Position: measured vertical location should follow the sent top/middle/bottom.
-    ys = np.array([p["y"] for p in per_state])
-    sent_y = np.array([POSITION_Y[p["sent_position"]] for p in per_state])
-    position_corr = float(np.corrcoef(ys, sent_y)[0, 1]) if np.ptp(sent_y) > 0 and np.ptp(ys) > 0 else 0.0
-
-    # Color from sequential differences of the red-vs-green balance (cast cancels).
+    # Color from sequential differences of the red-vs-green balance, so a color cast cancels.
     def balance(rgb):
         return float((rgb[0] - rgb[1]) / (abs(rgb[0]) + abs(rgb[1]) + 1e-6))
     sent_bal = {"red": balance(np.array(COLORS["red"], float)), "green": -1.0, "black": 0.0}
-    mb = np.array([balance(p["rgb"]) for p in per_state])
-    sb = np.array([sent_bal[p["sent_color"]] for p in per_state])
+    mb = np.array([balance(p["rgb"]) for p in per])
+    sb = np.array([sent_bal[p["s"].shape_color] for p in per])
     dm, ds = np.diff(mb), np.diff(sb)
     keep = np.abs(ds) > 1e-3
     color_score = float((dm[keep] * ds[keep]).sum() / (np.linalg.norm(dm[keep]) * np.linalg.norm(ds[keep]) + 1e-9)) if keep.any() else 0.0
 
-    for p in per_state:
-        p.pop("rgb"); p.pop("y")
+    inside_iris = bool(np.median(np.hypot(us, vs)) < 1.0)
+    geometry_ok = bool(inside_iris and 0.3 <= size_ratio <= 3.0)
     return {
         "ok": True,
-        "shape_accuracy": round(shape_acc, 3),
-        "shape_margin": round(shape_margin, 3),
+        "shape_readable": shape_readable,
+        "shape_accuracy": None if shape_acc is None else round(shape_acc, 3),
         "position_corr": round(position_corr, 3),
+        "position_accuracy": round(float(np.mean([so.get("decoded_position") == so["sent_position"] for so in states_out])), 3),
         "color_score": round(color_score, 3),
-        "geometry_ok": bool(geometry_ok),
+        "geometry_ok": geometry_ok,
+        "inside_iris": inside_iris,
         "size_ratio": round(float(size_ratio), 2),
-        "reflection_width_mm": round(float(measured_w_px / px_per_mm), 2),
-        "contrast": round(loc["contrast"], 1),
-        "roi": box,
-        "states": per_state,
+        "reflection_width_mm": round(float(measured_px / px_per_mm), 2),
+        "expected_width_mm": round(float(span_px / px_per_mm), 2),
+        "expected_span_px": round(float(span_px), 1),
+        "iris_radius_px": round(float(ir), 1),
+        "distance_mm": round(float(distance_mm)),
+        "x_spread": round(float(np.std(us)), 3),
+        "states": states_out,
     }
