@@ -28,7 +28,6 @@ THRESHOLDS = {
     # 0.43-0.67, strangers <= 0.09.
     "continuity_min": 0.25,
     "max_selfie_to_check_s": 25.0,
-    "transit_max_gap_s": 0.6,     # frames arrive every 0.1 s; a hole means the camera view was not continuous
     "transit_max_blur_s": 1.0,
     "rppg_snr_db_min": 2.0,
 }
@@ -157,14 +156,15 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
             failures.append("a different face appeared between the selfie and the eye check")
         elif transit["cuts"] > 0:
             failures.append(f"the camera view jumped {transit['cut_at_s'][0]:.1f} s after the selfie (not one continuous move)")
-        elif transit["worst_gap_s"] > T["transit_max_gap_s"]:
-            failures.append(f"{transit['worst_gap_s']:.1f} s of camera frames are missing between the selfie and the eye check")
+        elif transit.get("unbridged_gap_s", 0) > 0:
+            failures.append(f"{transit['unbridged_gap_s']:.1f} s of camera frames are missing between the selfie and the eye check, "
+                            "and the view is different afterwards")
         elif transit["faces_seen"] < 2:
             unverifiable.append("no face was visible right after the selfie")
         elif transit["longest_blur_s"] > T["transit_max_blur_s"]:
             unverifiable.append("the move to the eye was too fast to follow; bring the phone in steadily")
         if transit.get("ok") and any(t["name"] == "Continuity" for t in tiles) and (
-                transit["stranger_frames"] or transit["cuts"] or transit["worst_gap_s"] > T["transit_max_gap_s"]):
+                transit["stranger_frames"] or transit["cuts"] or transit.get("unbridged_gap_s", 0) > 0):
             for t in tiles:
                 if t["name"] == "Continuity":
                     t.update(status="red", headline="Broken", detail=failures[-1])

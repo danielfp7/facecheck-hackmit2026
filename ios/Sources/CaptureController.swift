@@ -46,9 +46,13 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
     // Transit: small frames from the selfie until the flashes start, so the server can
     // watch the move to the eye as one continuous shot.
     private var transitOn = false
+    private var lastTransit = 0.0
+    private var transitSeen = 0, transitQueued = 0, transitDrops = 0
+    private var transitSlowestMS = 0.0
+    // Owned by `encodeQueue`: JPEG encoding stays off the capture queue.
+    private let encodeQueue = DispatchQueue(label: "inhuman.transit.encode")
     private var transitBlob = Data()
     private var transitTS: [Double] = []
-    private var lastTransit = 0.0
     static let transitInterval = 0.1, transitWidth: CGFloat = 480, transitMaxFrames = 260
 
     private(set) var fps: Double = 30
@@ -274,9 +278,9 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
 
     func startTransit() {
         queue.async {
-            self.transitBlob = Data()
-            self.transitTS = []
             self.lastTransit = 0
+            self.transitSeen = 0; self.transitQueued = 0; self.transitDrops = 0; self.transitSlowestMS = 0
+            self.encodeQueue.sync { self.transitBlob = Data(); self.transitTS = [] }
             self.transitOn = true
         }
     }
@@ -285,31 +289,75 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
         queue.async { self.transitOn = false }
     }
 
-    /// Frames packed as repeated [uint32 little-endian length][JPEG], plus their timestamps.
-    func takeTransit() async -> (blob: Data, ts: [Double]) {
+    /// Frames packed as repeated [uint32 little-endian length][JPEG], their timestamps, and
+    /// counters that tell a recording problem apart from a real break in the camera view.
+    func takeTransit() async -> (blob: Data, ts: [Double], diag: [String: Any]) {
         await withCheckedContinuation { cont in
             queue.async {
                 self.transitOn = false
-                cont.resume(returning: (self.transitBlob, self.transitTS))
-                self.transitBlob = Data()
-                self.transitTS = []
+                let diag: [String: Any] = ["frames_seen": self.transitSeen, "frames_queued": self.transitQueued,
+                                           "camera_drops": self.transitDrops, "slowest_ms": self.transitSlowestMS]
+                self.encodeQueue.async {                       // after every pending encode
+                    cont.resume(returning: (self.transitBlob, self.transitTS, diag))
+                    self.transitBlob = Data()
+                    self.transitTS = []
+                }
             }
         }
     }
 
+    /// Downscale on the CPU straight from the YCbCr planes (2x2 averaged luma, so fine detail
+    /// isn't aliased). No Core Image or GPU work on the capture queue: the first version
+    /// rendered through CIContext here and lost 9 s of frames on a real run.
+    private func smallRGBA(_ pb: CVPixelBuffer, width outW: Int) -> (bytes: [UInt8], w: Int, h: Int)? {
+        CVPixelBufferLockBaseAddress(pb, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pb, .readOnly) }
+        guard CVPixelBufferGetPlaneCount(pb) >= 2,
+              let yBase = CVPixelBufferGetBaseAddressOfPlane(pb, 0),
+              let cBase = CVPixelBufferGetBaseAddressOfPlane(pb, 1) else { return nil }
+        let w = CVPixelBufferGetWidthOfPlane(pb, 0), h = CVPixelBufferGetHeightOfPlane(pb, 0)
+        let yStride = CVPixelBufferGetBytesPerRowOfPlane(pb, 0), cStride = CVPixelBufferGetBytesPerRowOfPlane(pb, 1)
+        let yp = yBase.assumingMemoryBound(to: UInt8.self), cp = cBase.assumingMemoryBound(to: UInt8.self)
+        let outH = h * outW / w
+        var out = [UInt8](repeating: 255, count: outW * outH * 4)
+        out.withUnsafeMutableBufferPointer { dst in
+            for oy in 0..<outH {
+                let sy = min(oy * h / outH, h - 2)
+                let r0 = yp + sy * yStride, r1 = yp + (sy + 1) * yStride, cRow = cp + (sy / 2) * cStride
+                for ox in 0..<outW {
+                    let sx = min(ox * w / outW, w - 2)
+                    let Y = (Int(r0[sx]) + Int(r0[sx + 1]) + Int(r1[sx]) + Int(r1[sx + 1])) >> 2
+                    let cx = (sx / 2) * 2
+                    let cb = Int(cRow[cx]) - 128, cr = Int(cRow[cx + 1]) - 128
+                    // Full-range BT.709, fixed point (x1024).
+                    let R = Y + (1613 * cr) >> 10
+                    let G = Y - (192 * cb + 479 * cr) >> 10
+                    let B = Y + (1900 * cb) >> 10
+                    let i = (oy * outW + ox) * 4
+                    dst[i] = UInt8(max(0, min(255, R))); dst[i + 1] = UInt8(max(0, min(255, G))); dst[i + 2] = UInt8(max(0, min(255, B)))
+                }
+            }
+        }
+        return (out, outW, outH)
+    }
+
     private func appendTransit(_ pixels: CVPixelBuffer, at ts: Double) {
-        guard transitTS.count < CaptureController.transitMaxFrames else { return }
-        let image = CIImage(cvPixelBuffer: pixels)
-        let scale = CaptureController.transitWidth / image.extent.width
-        let small = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        guard let jpeg = ciContext.jpegRepresentation(
-            of: small, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-            options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.65]) else { return }
-        var n = UInt32(jpeg.count).littleEndian
-        withUnsafeBytes(of: &n) { transitBlob.append(contentsOf: $0) }
-        transitBlob.append(jpeg)
-        transitTS.append(ts)
+        guard transitQueued < CaptureController.transitMaxFrames,
+              let small = smallRGBA(pixels, width: Int(CaptureController.transitWidth)) else { return }
+        transitQueued += 1
         lastTransit = ts
+        encodeQueue.async {
+            guard let provider = CGDataProvider(data: Data(small.bytes) as CFData),
+                  let cg = CGImage(width: small.w, height: small.h, bitsPerComponent: 8, bitsPerPixel: 32,
+                                   bytesPerRow: small.w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+                                   provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent),
+                  let jpeg = UIImage(cgImage: cg).jpegData(compressionQuality: 0.65) else { return }
+            var n = UInt32(jpeg.count).littleEndian
+            withUnsafeBytes(of: &n) { self.transitBlob.append(contentsOf: $0) }
+            self.transitBlob.append(jpeg)
+            self.transitTS.append(ts)
+        }
     }
 
     // MARK: Heartbeat sampling
@@ -408,8 +456,13 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
         }
 
         if transitOn {
+            transitSeen += 1
             let ts = hostSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
-            if ts - lastTransit >= CaptureController.transitInterval - 0.004 { appendTransit(pixels, at: ts) }
+            if ts - lastTransit >= CaptureController.transitInterval - 0.004 {
+                let began = CACurrentMediaTime()
+                appendTransit(pixels, at: ts)
+                transitSlowestMS = max(transitSlowestMS, (CACurrentMediaTime() - began) * 1000)
+            }
         }
 
         if sampling {
@@ -441,6 +494,7 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
     }
 
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        if transitOn { transitDrops += 1 }
         guard recording else { return }
         droppedTS.append(hostSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer)))
     }

@@ -198,6 +198,7 @@ final class Flow: ObservableObject {
         if let rppg = b.rppg { fullMeta["rppg"] = rppg }
         let transit = await capture.takeTransit()
         fullMeta["transit_ts"] = transit.ts
+        fullMeta["transit_diag"] = transit.diag
         do {
             let json = try JSONSerialization.data(withJSONObject: fullMeta)
             result = try await api.verify(challengeID: ch.id, metaJSON: json, video: b.videoURL, selfie: selfie,

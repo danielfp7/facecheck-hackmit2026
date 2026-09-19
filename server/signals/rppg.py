@@ -18,15 +18,20 @@ BAND_HZ = (0.7, 3.0)       # 42-180 bpm
 
 
 def _skin_cells(rgb: np.ndarray) -> np.ndarray:
-    """Boolean mask over grid cells that look like steadily lit skin. rgb: (N, C, 3)."""
+    """Boolean mask over grid cells that are well exposed and steady. rgb: (N, C, 3).
+
+    No colour-order test: white balance is locked while the screen is green, which leaves
+    skin with a magenta cast (blue > green) during the white window. On a real capture a
+    red > green > blue rule threw away 22 of 24 cells.
+    """
     mean = rgb.mean(axis=0)
     luma = mean @ np.array([0.299, 0.587, 0.114])
-    exposed = (luma > 0.2) & (mean.max(axis=1) < 0.93)             # not dark, not clipped
-    skin = (mean[:, 0] > mean[:, 1]) & (mean[:, 1] > mean[:, 2] * 0.95)   # R > G >~ B
+    exposed = (luma > 0.25) & (mean.max(axis=1) < 0.93)             # not dark (hair, background), not clipped
+    if not exposed.any():
+        return exposed
     # Cells crossed by hair/eye/background edges swing with every small movement.
     wobble = rgb.std(axis=0).mean(axis=1) / np.maximum(luma, 1e-6)
-    steady = wobble <= max(2.5 * np.median(wobble[exposed & skin]) if (exposed & skin).any() else 1.0, 0.004)
-    return exposed & skin & steady
+    return exposed & (wobble <= 1.35 * np.median(wobble[exposed]))
 
 
 def pos(rgb: np.ndarray, fs: float, window_s: float = 1.6) -> np.ndarray:

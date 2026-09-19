@@ -92,6 +92,10 @@ def analyze(frames: list[np.ndarray], ts: list[float], selfie_emb: np.ndarray | 
     links = [same_view(thumbs[i], thumbs[i + 1]) for i in range(n - 1)]
     gaps = np.diff(t)
     worst_gap = float(gaps.max())
+    # A hole in the frames is only a problem if the view doesn't match across it. If it
+    # does (measured 0.83 across a real 9 s recording dropout), nothing changed unseen;
+    # a swap during the hole shows up as a weak link and as a different face afterwards.
+    unbridged = [float(g) for g, v in zip(gaps, links) if g > MAX_GAP_S and v < CLEAR_NCC]
     # A cut is an isolated collapse between two clear stretches. A run of weak links is
     # blur from moving or refocusing, which says nothing either way.
     def clear(j: int) -> bool:
@@ -107,7 +111,10 @@ def analyze(frames: list[np.ndarray], ts: list[float], selfie_emb: np.ndarray | 
     if first_video_frame is not None:
         handover = same_view(thumbs[-1], _thumb(first_video_frame))
         if video_start_ts is not None:
-            worst_gap = max(worst_gap, float(video_start_ts - t[-1]))
+            join = float(video_start_ts - t[-1])
+            worst_gap = max(worst_gap, join)
+            if join > MAX_GAP_S and handover < CLEAR_NCC:
+                unbridged.append(join)
 
     # 1. identity held while a face is detectable (every 2nd frame keeps this fast)
     sims: list[tuple[int, float]] = []
@@ -132,6 +139,7 @@ def analyze(frames: list[np.ndarray], ts: list[float], selfie_emb: np.ndarray | 
         "cuts": len(cuts),
         "cut_at_s": [round(float(t[i + 1] - t[0]), 2) for i in cuts[:3]],
         "worst_gap_s": round(worst_gap, 2),
+        "unbridged_gap_s": round(max(unbridged), 2) if unbridged else 0.0,
         "longest_blur_s": round(blur_s, 2),
         "handover": None if handover is None else round(handover, 3),
         "faces_seen": len(sims),

@@ -63,7 +63,7 @@ class Challenge:
     # Vibration test: haptic bursts at server-chosen offsets from the first state, so
     # the timing can't be predicted or pre-rendered.
     haptic_times_s: list[float] = field(default_factory=list)
-    haptic_duration_s: float = 0.15
+    haptic_duration_s: float = 0.4
     # Heartbeat: steady soft white after the flashes. Below full white so screen-lit
     # skin doesn't clip under the exposure that was locked on the settle color.
     rppg_s: float = 8.0
@@ -83,13 +83,13 @@ class Challenge:
         return cls(id=d["id"], nonce=d["nonce"], states=states,
                    settle_color=d.get("settle_color", "green"), settle_s=d.get("settle_s", 0.6),
                    haptic_times_s=d.get("haptic_times_s", []),
-                   haptic_duration_s=d.get("haptic_duration_s", 0.15),
+                   haptic_duration_s=d.get("haptic_duration_s", 0.4),
                    rppg_s=d.get("rppg_s", 0.0), rppg_level=d.get("rppg_level", 0.8))
 
 
-def _haptic_times(rng: random.Random, total_s: float, n: int = 3, min_gap: float = 0.9) -> list[float]:
+def _haptic_times(rng: random.Random, total_s: float, n: int = 3, min_gap: float = 1.2) -> list[float]:
     """n random burst times inside the sequence, at least min_gap apart."""
-    lo, hi = 0.5, total_s - 0.5
+    lo, hi = 0.4, total_s - 0.7
     for _ in range(200):
         ts = sorted(rng.uniform(lo, hi) for _ in range(n))
         if all(b - a >= min_gap for a, b in zip(ts, ts[1:])):

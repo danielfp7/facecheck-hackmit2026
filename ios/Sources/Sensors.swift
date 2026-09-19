@@ -56,12 +56,21 @@ final class HapticPlayer {
 
     func burst(duration: Double) {
         guard let engine else { return }
-        let event = CHHapticEvent(eventType: .hapticContinuous, parameters: [
-            CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
-            CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.4),
-        ], relativeTime: 0, duration: duration)
+        // As strong as the Taptic Engine goes: full intensity and sharpness held for the whole
+        // burst, plus sharp transients through it. (0.15 s at sharpness 0.4 registered at only
+        // ~4x background on the accelerometer and was barely visible to the camera.)
+        func p(_ id: CHHapticEvent.ParameterID, _ v: Float) -> CHHapticEventParameter { CHHapticEventParameter(parameterID: id, value: v) }
+        var events = [CHHapticEvent(eventType: .hapticContinuous,
+                                    parameters: [p(.hapticIntensity, 1.0), p(.hapticSharpness, 1.0)],
+                                    relativeTime: 0, duration: duration)]
+        var t = 0.0
+        while t < duration {
+            events.append(CHHapticEvent(eventType: .hapticTransient,
+                                        parameters: [p(.hapticIntensity, 1.0), p(.hapticSharpness, 1.0)], relativeTime: t))
+            t += 0.04
+        }
         do {
-            let player = try engine.makePlayer(with: CHHapticPattern(events: [event], parameters: []))
+            let player = try engine.makePlayer(with: CHHapticPattern(events: events, parameters: []))
             let now = CACurrentMediaTime()
             try player.start(atTime: CHHapticTimeImmediate)
             log.append(["ts": now, "duration_s": duration])
