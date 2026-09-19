@@ -124,6 +124,22 @@ def new_challenge(req: ChallengeRequest | None = None):
     return ch.to_dict()
 
 
+def _json_safe(x):
+    """NaN and infinities aren't valid JSON; a dead signal (covered lens, test pattern) can
+    produce them. Report those values as missing instead of failing the request."""
+    if isinstance(x, dict):
+        return {k: _json_safe(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_json_safe(v) for v in x]
+    if isinstance(x, (float, np.floating)):
+        return float(x) if np.isfinite(x) else None
+    if isinstance(x, np.integer):
+        return int(x)
+    if isinstance(x, np.bool_):
+        return bool(x)
+    return x
+
+
 def run_pipeline(video: Path, meta: dict, ch: challenge_mod.Challenge,
                  selfie: bytes | None, user: str | None, transit_blob: bytes | None = None) -> dict:
     b = bundle_mod.load(video, meta)
@@ -148,7 +164,7 @@ def run_pipeline(video: Path, meta: dict, ch: challenge_mod.Challenge,
     cont_r = continuity.analyze(stash, selfie_emb, enrolled_emb) if selfie else None
     transit_r = None
     if transit_blob:
-        cap = cv2.VideoCapture(str(video))
+        cap = bundle_mod.open_frames(video)
         ok, first = cap.read()
         cap.release()
         transit_r = transit.analyze(transit.unpack(transit_blob), meta.get("transit_ts", []), selfie_emb,
@@ -165,7 +181,8 @@ def run_pipeline(video: Path, meta: dict, ch: challenge_mod.Challenge,
 
 
 @app.post("/verify")
-def verify(challenge_id: str = Form(...), meta: str = Form(...), video: UploadFile = File(...),
+def verify(challenge_id: str = Form(...), meta: str = Form(...), video: UploadFile | None = File(None),
+           frames: UploadFile | None = File(None),
            selfie: UploadFile | None = File(None), transit: UploadFile | None = File(None),
            user: str | None = Form(None),
            request_id: str | None = Form(None), label: str | None = Form(None)):
@@ -178,9 +195,15 @@ def verify(challenge_id: str = Form(...), meta: str = Form(...), video: UploadFi
     # Keep every capture: thresholds are set by replaying these (tools/replay.py).
     cap_dir = CAPTURES / f"{time.strftime('%m%d-%H%M%S')}_{_safe(label) if label else 'run'}_{ch.id}"
     cap_dir.mkdir(parents=True)
-    suffix = Path(video.filename or "video.mov").suffix or ".mov"
-    vpath = cap_dir / f"video{suffix}"
-    vpath.write_bytes(video.file.read())
+    if video is None and frames is None:
+        raise HTTPException(422, "send either a video file or a frames container")
+    if video is not None:
+        suffix = Path(video.filename or "video.mov").suffix or ".mov"
+        vpath = cap_dir / f"video{suffix}"
+        vpath.write_bytes(video.file.read())
+    else:                       # the web client: timestamped JPEG frames (see bundle.JpegSequence)
+        vpath = cap_dir / "video.bin"
+        vpath.write_bytes(frames.file.read())
     meta_d = json.loads(meta)
     (cap_dir / "meta.json").write_text(json.dumps(meta_d))
     (cap_dir / "challenge.json").write_text(json.dumps(ch.to_dict()))
@@ -192,7 +215,7 @@ def verify(challenge_id: str = Form(...), meta: str = Form(...), video: UploadFi
         (cap_dir / "transit.bin").write_bytes(transit_bytes)
 
     t0 = time.time()
-    result = run_pipeline(vpath, meta_d, ch, selfie_bytes, user, transit_bytes)
+    result = _json_safe(run_pipeline(vpath, meta_d, ch, selfie_bytes, user, transit_bytes))
     result["processing_s"] = round(time.time() - t0, 2)
     result["capture"] = cap_dir.name
     (cap_dir / "result.json").write_text(json.dumps(result))

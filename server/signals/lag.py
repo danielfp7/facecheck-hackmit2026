@@ -55,25 +55,32 @@ class Expected:
         return (self._integral(t + window / 2) - self._integral(t - window / 2)) / window
 
 
-def _fit_r2(m: np.ndarray, e: np.ndarray) -> tuple[float, np.ndarray]:
-    """Per-channel m = a + b*e with b >= 0; pooled R^2 over channels.
+def _fit_r2(m: np.ndarray, e: np.ndarray, full: bool = False) -> tuple[float, np.ndarray]:
+    """Fit m = a + e @ B.T and return (pooled R^2, B).
 
-    Pooling unnormalised residuals keeps a channel with no signal (blue) from
-    dominating the score with its noise.
+    Locked exposure (phone): B is diagonal and non-negative, one gain per channel.
+    Pooling unnormalised residuals keeps a channel with no signal (blue) from dominating.
+
+    Unlocked exposure (webcam): the measurement is chromaticity, where lighting one
+    channel lowers the share of the others, so B is a full 3x3 mixing matrix.
     """
     mc = m - m.mean(axis=0)
     ec = e - e.mean(axis=0)
-    var_e = (ec ** 2).sum(axis=0)
-    b = np.where(var_e > 1e-12, (mc * ec).sum(axis=0) / np.maximum(var_e, 1e-12), 0.0)
-    b = np.maximum(b, 0.0)
-    resid = ((mc - ec * b) ** 2).sum()
+    if full:
+        X, *_ = np.linalg.lstsq(ec, mc, rcond=None)          # (3, 3): ec @ X ~ mc
+        B = X.T
+    else:
+        var_e = (ec ** 2).sum(axis=0)
+        b = np.where(var_e > 1e-12, (mc * ec).sum(axis=0) / np.maximum(var_e, 1e-12), 0.0)
+        B = np.diag(np.maximum(b, 0.0))
+    resid = ((mc - ec @ B.T) ** 2).sum()
     total = (mc ** 2).sum()
-    return (1.0 - resid / total if total > 1e-12 else 0.0), b
+    return (1.0 - resid / total if total > 1e-12 else 0.0), B
 
 
 def _best_lag(m: np.ndarray, ts: np.ndarray, exp: Expected, window: float,
-              grid_ms: np.ndarray = LAG_GRID_MS) -> tuple[float, float, np.ndarray]:
-    scores = np.array([_fit_r2(m, exp.sample(ts - lag / 1000.0, window))[0] for lag in grid_ms])
+              grid_ms: np.ndarray = LAG_GRID_MS, full: bool = False) -> tuple[float, float, np.ndarray]:
+    scores = np.array([_fit_r2(m, exp.sample(ts - lag / 1000.0, window), full)[0] for lag in grid_ms])
     i = int(np.argmax(scores))
     lag = float(grid_ms[i])
     # Parabolic refinement around the peak.
@@ -82,8 +89,8 @@ def _best_lag(m: np.ndarray, ts: np.ndarray, exp: Expected, window: float,
         denom = y0 - 2 * y1 + y2
         if abs(denom) > 1e-12:
             lag += float(0.5 * (y0 - y2) / denom * (grid_ms[1] - grid_ms[0]))
-    _, gains = _fit_r2(m, exp.sample(ts - lag / 1000.0, window))
-    return lag, float(scores[i]), gains
+    _, B = _fit_r2(m, exp.sample(ts - lag / 1000.0, window), full)
+    return lag, float(scores[i]), B
 
 
 def analyze(bundle: Bundle, ch: Challenge) -> dict:
@@ -96,18 +103,24 @@ def analyze(bundle: Bundle, ch: Challenge) -> dict:
     t0, t1 = events[0][1], events[-1][1] + ch.states[-1].duration_s
     mask = (ts >= t0) & (ts <= t1 + 0.6)
     m_all = diffuse_trace(bundle.small)
+    overexposed = bool(m_all[mask].mean() > 0.92) if mask.any() else False
+    # A webcam's auto-exposure rescales brightness on every flash, so brightness can't be
+    # trusted there. Colour balance can: work in chromaticity and fit full colour mixing.
+    chroma = not bundle.meta.get("camera", {}).get("exposure_locked", True)
+    if chroma:
+        m_all = m_all / np.maximum(m_all.sum(axis=1, keepdims=True), 1e-6)
     m, t = m_all[mask], ts[mask]
     if len(t) < 10:
         return {"ok": False, "reason": "too few frames inside the challenge window"}
 
-    lag_ms, r2, gains = _best_lag(m, t, exp, window)
+    lag_ms, r2, B = _best_lag(m, t, exp, window, full=chroma)
 
     # Per-transition lags from a local fit, for jitter.
     per = []
     for _, te in events[1:]:
         loc = (t >= te - 0.25) & (t <= te + 0.25 + max(lag_ms, 0) / 1000.0)
         if loc.sum() >= 6 and np.ptp(m[loc]) > 1e-4:
-            l, s, _ = _best_lag(m[loc], t[loc], exp, window)
+            l, s, _ = _best_lag(m[loc], t[loc], exp, window, full=chroma)
             if s > 0.5:
                 per.append(l)
     per = np.array(per)
@@ -129,20 +142,22 @@ def analyze(bundle: Bundle, ch: Challenge) -> dict:
         # gain applied). Dividing the measurement by the gains instead would blow up
         # noise in a channel the screen barely drives, such as blue.
         dm = np.diff(np.array(plateaus), axis=0)
-        de = np.diff(np.array(sent), axis=0) * gains
+        de = np.diff(np.array(sent), axis=0) @ B.T
         keep = np.linalg.norm(de, axis=1) > 1e-3
         num = (dm[keep] * de[keep]).sum(axis=1)
         den = np.linalg.norm(dm[keep], axis=1) * np.linalg.norm(de[keep], axis=1) + 1e-12
         diff_score = float(np.mean(num / den))
 
-    expected_at_lag = exp.sample(t - lag_s, window) * gains + (m.mean(axis=0) - (exp.sample(t - lag_s, window) * gains).mean(axis=0))
+    fitted = exp.sample(t - lag_s, window) @ B.T
+    expected_at_lag = fitted + (m.mean(axis=0) - fitted.mean(axis=0))
     return {
         "ok": True,
         "lag_ms": round(lag_ms, 1),
         "lag_jitter_ms": None if jitter_ms is None else round(jitter_ms, 1),
         "response_r2": round(r2, 3),
         "diff_score": None if diff_score is None else round(diff_score, 3),
-        "overexposed": bool(m.mean() > 0.92),
+        "overexposed": overexposed,
+        "mode": "chromaticity" if chroma else "intensity",
         "plot": {
             "t": np.round(t - t0, 4).tolist(),
             "measured": np.round(m, 4).tolist(),

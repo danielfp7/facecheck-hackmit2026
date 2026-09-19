@@ -133,7 +133,7 @@ def capture(ch: challenge_mod.Challenge, args) -> tuple[Path, dict, bytes]:
         "device_model": "mac-webcam" + ("-attack" if (swap or args.attack_delay_ms) else ""),
         "frames": frame_ts, "dropped": [], "display_events": events,
         "camera": {"width": w, "height": h, "fps": fps, "fov_deg": 60.0, "mirrored": False,
-                   "iso": 0, "exposure_s": 0, "focus_locked": False, "min_focus_mm": -1},
+                   "iso": 0, "exposure_s": 0, "focus_locked": False, "exposure_locked": False, "min_focus_mm": -1},
         "screen": {"brightness": 1.0, "width_mm": 300, "height_mm": 190},
         "distance_mm": 400, "imu": [], "haptics": [],
     }

@@ -26,7 +26,10 @@ IRIS_R = 70
 
 
 def make(ch: Challenge, out_dir: Path, lag_ms: float = 60.0, responsive: bool = True,
-         glint: bool = True, flat_mirror: bool = False, seed: int = 0) -> tuple[Path, Path]:
+         glint: bool = True, flat_mirror: bool = False, seed: int = 0,
+         auto_exposure: bool = False) -> tuple[Path, Path]:
+    """auto_exposure simulates a webcam: gain chases a target brightness with a ~150 ms
+    time constant, so brightness steps are partly cancelled and smeared."""
     out_dir.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(seed)
     video = out_dir / "video.mp4"
@@ -59,6 +62,7 @@ def make(ch: Challenge, out_dir: Path, lag_ms: float = 60.0, responsive: bool = 
     shade = 0.85 + 0.15 * np.cos((xx - W / 2) / W * 2.2) * np.cos((yy - H / 2) / H * 1.6)
 
     frame_ts = []
+    ae_gain = 1.0
     n = int((t_end - t_start) * FPS)
     sub = 4  # sub-frame samples to mimic exposure/rolling-shutter integration
     for i in range(n):
@@ -90,6 +94,10 @@ def make(ch: Challenge, out_dir: Path, lag_ms: float = 60.0, responsive: bool = 
             region = img[y0:y0 + gh, x0:x0 + gw]
             img[y0:y0 + gh, x0:x0 + gw] = region + 0.55 * g
 
+        if auto_exposure:
+            want = 0.42 / max(float(img.mean()), 1e-3)
+            ae_gain += (want - ae_gain) * (1 - np.exp(-(1 / FPS) / 0.15))
+            img = img * ae_gain
         img = img + rng.normal(0, 0.006, img.shape)
         bgr = (np.clip(img, 0, 1)[:, :, ::-1] * 255).astype(np.uint8)
         vw.write(bgr)
@@ -103,7 +111,8 @@ def make(ch: Challenge, out_dir: Path, lag_ms: float = 60.0, responsive: bool = 
         "dropped": [],
         "display_events": [{"state_index": si, "ts": te} for si, te in events],
         "camera": {"width": W, "height": H, "fps": FPS, "fov_deg": 45.0, "mirrored": False,
-                   "iso": 100, "exposure_s": 1 / 120, "focus_locked": True, "min_focus_mm": 60},
+                   "iso": 100, "exposure_s": 1 / 120, "focus_locked": True, "min_focus_mm": 60,
+                   "exposure_locked": not auto_exposure},
         "screen": {"brightness": 1.0, "width_mm": 70, "height_mm": 150},
         "distance_mm": 76,
         "imu": [], "haptics": [],

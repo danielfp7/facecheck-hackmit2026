@@ -16,12 +16,14 @@ import cv2
 import numpy as np
 from scipy import signal as sps
 
+from bundle import open_frames
+
 CROP = 512
 
 
 def measure_video(video_path, n_frames: int) -> np.ndarray:
     """Frame-to-frame global shift (dx, dy) in px from a central crop, shape (N, 2)."""
-    cap = cv2.VideoCapture(str(video_path))
+    cap = open_frames(video_path)
     shifts = np.zeros((n_frames, 2))
     prev, win = None, None
     for i in range(n_frames):

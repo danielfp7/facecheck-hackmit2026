@@ -202,3 +202,37 @@ def test_transit_flags_missing_frames():
     ts = [i * 0.1 for i in range(15)] + [3.0 + i * 0.1 for i in range(15)]
     r = transit.analyze(_move_in(_texture(1), 30), ts, None)
     assert r["worst_gap_s"] > 1.0
+
+
+# ---------- webcam: auto-exposure can't be locked in a browser ----------
+
+def test_lag_survives_auto_exposure(ch, tmp_path):
+    v, m = synth.make(ch, tmp_path / "ae_real", lag_ms=90, auto_exposure=True)
+    fast = lag.analyze(bundle.load(v, m), ch)
+    v, m = synth.make(ch, tmp_path / "ae_slow", lag_ms=290, auto_exposure=True)
+    slow = lag.analyze(bundle.load(v, m), ch)
+    assert fast["mode"] == "chromaticity" and fast["response_r2"] > 0.8
+    assert abs(fast["lag_ms"] - 90) < 25                    # within ~1.5 frames
+    assert abs((slow["lag_ms"] - fast["lag_ms"]) - 200) < 20
+
+
+def test_jpeg_container_reads_like_a_video(tmp_path):
+    import struct
+    import cv2
+    import numpy as np
+    blob = b""
+    for i in range(5):
+        img = np.full((48, 64, 3), 40 * i, np.uint8)
+        jpg = cv2.imencode(".jpg", img)[1].tobytes()
+        blob += struct.pack("<I", len(jpg)) + jpg
+    path = tmp_path / "video.bin"
+    path.write_bytes(blob)
+    cap = bundle.open_frames(path)
+    assert cap.isOpened() and int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) == 64
+    frames = []
+    while True:
+        ok, f = cap.read()
+        if not ok:
+            break
+        frames.append(f)
+    assert len(frames) == 5 and abs(int(frames[3].mean()) - 120) <= 2

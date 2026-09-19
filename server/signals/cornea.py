@@ -21,14 +21,14 @@ import base64
 import cv2
 import numpy as np
 
-from bundle import Bundle
+from bundle import Bundle, open_frames
 from challenge import Challenge, COLORS, SHAPES, SHAPE_SPAN
 from render import shape_mask, POSITION_Y
 
 CORNEA_FOCAL_MM = 3.9          # R/2 for a 7.8 mm cornea
 IRIS_DIAMETER_MM = 11.7
-LOCALIZE_W = 1080              # localisation runs at this width at most
-DRIFT_PX = 50                  # eye drift tolerated between states, at LOCALIZE_W scale
+LOCALIZE_W = 1080              # localisation runs with the frame's short side at most this
+DRIFT_PX = 70                  # eye drift tolerated between states, at LOCALIZE_W scale
 CROP_HALF = 260                # eye crop half-size, at LOCALIZE_W scale
 MIN_READABLE_SPAN_PX = 18      # below this the outline can't be told apart; score layout only
 SCALES = np.linspace(0.6, 1.6, 8)
@@ -53,7 +53,7 @@ def _assign(ts: np.ndarray, events, ch: Challenge, lag_s: float, guard: float) -
 def _state_means(video_path, assign: np.ndarray, width: int | None = None,
                  box: tuple[int, int, int, int] | None = None) -> dict[int, np.ndarray]:
     """One pass over the video accumulating the mean RGB frame per state."""
-    cap = cv2.VideoCapture(str(video_path))
+    cap = open_frames(video_path)
     acc: dict[int, np.ndarray] = {}
     cnt: dict[int, int] = {}
     for si in assign:
@@ -197,8 +197,8 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
     shape_states = [s for s in ch.states if s.shape is not None]
 
     # ---- 1. find the eye on frames at most LOCALIZE_W wide
-    lw = min(W, LOCALIZE_W)
-    k = lw / W
+    k = min(1.0, LOCALIZE_W / min(W, H))     # short side: a landscape webcam frame is not shrunk
+    lw = round(W * k)
     means = _state_means(bundle.video_path, assign, width=lw)
     usable = [s for s in shape_states if s.index in means and _nearest_black(ch, means, s.index) is not None]
     if len(usable) < 4:
@@ -267,7 +267,7 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
 
     # Coarse size check before anything else: flat glass or a print reflects far too large.
     seed_med = np.median(np.array([p["g"] for p in per]), axis=0)
-    iris = fit_iris(ref_gray, (float(seed_med[0]), float(seed_med[1])), rmin=18 * fs, rmax=140 * fs)
+    iris = fit_iris(ref_gray, (float(seed_med[0]), float(seed_med[1])), rmin=12 * fs, rmax=140 * fs)
 
     fov = np.deg2rad(float(meta["camera"].get("fov_deg", 46)))
     if iris is not None:
@@ -277,7 +277,11 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
         distance_mm = float(meta.get("distance_mm", 120))
         px_per_mm = W / (2 * distance_mm * np.tan(fov / 2))
     mag = CORNEA_FOCAL_MM / (distance_mm + CORNEA_FOCAL_MM)
-    span_px = SHAPE_SPAN * float(meta["screen"].get("width_mm", 65)) * mag * px_per_mm
+    # Phones draw the shape at SHAPE_SPAN of the screen width; the web client, on a wide
+    # screen, sizes it from the height instead and says so.
+    screen = meta.get("screen", {})
+    span_mm = float(screen.get("shape_span_mm") or SHAPE_SPAN * float(screen.get("width_mm", 65)))
+    span_px = span_mm * mag * px_per_mm
     measured_px = float(np.median([p["diameter"] for p in per]))
     # Blur and pixelation put a floor of a few px under any measured blob.
     size_ratio = measured_px / max(span_px, 4.0 * fs)
@@ -338,12 +342,21 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
 
     us, vs = np.array(us), np.array(vs)
     sent_y = np.array([POSITION_Y[p["s"].position] for p in per])
-    position_corr = float(np.corrcoef(vs, sent_y)[0, 1]) if np.ptp(sent_y) > 0 and np.ptp(vs) > 1e-6 else 0.0
+    # Phones place the shape top/middle/bottom; a wide laptop screen has no vertical room,
+    # so the web client places it left/middle/right and the reflection moves along x.
+    # A cornea mirrors left-right and whether the capture is mirrored varies by browser,
+    # so along x only the strength of the relationship is scored, not its sign.
+    axis = screen.get("position_axis", "y")
+    along, across = (us, vs) if axis == "x" else (vs, us)
+    position_corr = float(np.corrcoef(along, sent_y)[0, 1]) if np.ptp(sent_y) > 0 and np.ptp(along) > 1e-6 else 0.0
+    position_corr_signed = position_corr
+    if axis == "x":
+        position_corr = abs(position_corr)
     # Decode each state's level from the fitted line, for the results tile.
     if np.ptp(sent_y) > 0:
-        slope, icpt = np.polyfit(sent_y, vs, 1)
+        slope, icpt = np.polyfit(sent_y, along, 1)
         levels = {name: icpt + slope * y for name, y in POSITION_Y.items()}
-        for so, v in zip(states_out, vs):
+        for so, v in zip(states_out, along):
             so["decoded_position"] = min(levels, key=lambda n: abs(levels[n] - v))
     shape_readable = bool(temps) and all(so["decoded_shape"] != "?" for so in states_out)
     shape_acc = float(np.mean([so["decoded_shape"] == so["sent_shape"] for so in states_out])) if shape_readable else None
@@ -378,6 +391,8 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
         "expected_span_px": round(float(span_px), 1),
         "iris_radius_px": round(float(ir), 1),
         "distance_mm": round(float(distance_mm)),
-        "x_spread": round(float(np.std(us)), 3),
+        "position_axis": axis,
+        "position_corr_signed": round(position_corr_signed, 3),
+        "x_spread": round(float(np.std(across)), 3),
         "states": states_out,
     }

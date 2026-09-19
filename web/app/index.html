@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InHuman</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app">
+
+  <!-- Home: waiting for a sign-in request -->
+  <section id="home" class="screen">
+    <div class="card center">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="56" height="56"><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z" fill="currentColor" opacity=".16"/><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="m17 24 5 5 9-10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h1>InHuman</h1>
+      <p id="status" class="muted">Connecting…</p>
+      <label class="field">Username
+        <input id="user" autocomplete="off" spellcheck="false">
+      </label>
+      <div class="row">
+        <label class="field grow">Capture label
+          <select id="label">
+            <option>real</option><option>screen-attack</option><option>replay</option><option>print</option>
+          </select>
+        </label>
+      </div>
+      <button id="btnTest" class="secondary" hidden>Run a test check</button>
+      <button id="btnEnroll" class="primary">Enroll my face</button>
+      <p class="fine muted">Turn your screen brightness all the way up. Dim rooms work best: the check reads how the screen's light falls on your face and eye.</p>
+    </div>
+  </section>
+
+  <!-- Approve a request from a relying party -->
+  <section id="approve" class="screen" hidden>
+    <div class="card center">
+      <h1>Sign-in request</h1>
+      <p id="approveText" class="muted"></p>
+      <button id="btnApprove" class="primary">Verify it's me</button>
+      <button id="btnDeny" class="danger">Deny</button>
+    </div>
+  </section>
+
+  <!-- Photosensitivity warning -->
+  <section id="warning" class="screen" hidden>
+    <div class="card center">
+      <div class="warn" aria-hidden="true">⚠</div>
+      <h1>Flashing colors ahead</h1>
+      <p class="muted">This check fills the screen with bright colored shapes for about 5 seconds, then holds a white screen for 8 seconds. Don't continue if you have photosensitive epilepsy. Press Esc at any time to stop.</p>
+      <button id="btnContinue" class="primary">Continue</button>
+      <button id="btnCancelWarn" class="secondary">Cancel</button>
+    </div>
+  </section>
+
+  <!-- Camera steps: selfie, then lean in -->
+  <section id="camera" class="screen" hidden>
+    <div class="viewfinder">
+      <video id="video" playsinline muted></video>
+      <div id="guide" class="guide"></div>
+      <div id="camBanner" class="banner"></div>
+      <div id="countdown" class="countdown" hidden></div>
+      <div class="controls">
+        <button id="btnShutter" class="shutter" aria-label="Take selfie"></button>
+        <button id="btnReady" class="primary" hidden>I'm in position</button>
+        <button id="btnCancelCam" class="ghost">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Full-screen flash stage -->
+  <div id="stage" hidden>
+    <svg id="shape" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="hold" hidden>
+      <div class="holdTitle">Keep your face right there</div>
+      <div class="holdSub">Reading your pulse</div>
+      <div id="holdCount" class="holdCount">8</div>
+    </div>
+  </div>
+
+  <section id="uploading" class="screen" hidden>
+    <div class="card center">
+      <div class="spinner"></div>
+      <p id="uploadText" class="muted">Checking the light response and eye reflection…</p>
+    </div>
+  </section>
+
+  <section id="results" class="screen" hidden>
+    <div class="resultsWrap">
+      <div id="verdict" class="verdict"></div>
+      <div id="tiles" class="tiles"></div>
+      <p id="timing" class="fine muted center"></p>
+      <button id="btnDone" class="primary">Done</button>
+    </div>
+  </section>
+
+  <div id="toast" class="toast" hidden></div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

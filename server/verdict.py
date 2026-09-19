@@ -19,6 +19,8 @@ THRESHOLDS = {
     # and genuine jitter at 1-2 frames, so +100 ms sits between the two.
     "lag_margin_ms": 100.0,
     "lag_default_baseline_ms": 70.0,
+    # Browser + webcam pipelines are slower and vary more; calibrate with replay.py --set-baseline.
+    "lag_default_baseline_web_ms": 130.0,
     "shape_accuracy_min": 0.6,    # chance is 0.33 with three shapes
     "position_corr_min": 0.7,
     "color_score_min": 0.5,
@@ -38,7 +40,8 @@ def baseline_ms(device_model: str) -> float:
         table = json.loads(BASELINES.read_text())
         if device_model in table:
             return float(table[device_model])
-    return THRESHOLDS["lag_default_baseline_ms"]
+    key = "lag_default_baseline_web_ms" if device_model.startswith("web") else "lag_default_baseline_ms"
+    return THRESHOLDS[key]
 
 
 def _tile(name: str, status: str, headline: str, detail: str = "") -> dict:
@@ -82,7 +85,8 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
     if not cornea.get("ok"):
         why = cornea.get("reason", "no eye reflection found")
         if why == "no eye reflection found":
-            why += " (hold the phone closer, with one eye in the outline)"
+            why += (" (lean in closer to the camera)" if str(meta.get("device_model", "")).startswith("web")
+                    else " (hold the phone closer, with one eye in the outline)")
         failures.append(why)
         tiles.append(_tile("Eye reflection", "red", "Not found", why))
     else:
@@ -174,10 +178,12 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
     if rppg is not None:
         if not rppg.get("ok"):
             tiles.append(_tile("Heartbeat", "yellow", "Not measured", rppg.get("reason", "")))
-        elif rppg["snr_db"] >= T["rppg_snr_db_min"]:
+        elif rppg.get("snr_db") is not None and rppg["snr_db"] >= T["rppg_snr_db_min"] and rppg.get("bpm"):
             tiles.append(_tile("Heartbeat", "green", f"{rppg['bpm']:.0f} bpm", f"signal {rppg['snr_db']:.1f} dB; weak evidence on its own"))
         else:
-            tiles.append(_tile("Heartbeat", "yellow", "No clear pulse", f"signal {rppg['snr_db']:.1f} dB; hold still, or this is a print"))
+            snr = rppg.get("snr_db")
+            tiles.append(_tile("Heartbeat", "yellow", "No clear pulse",
+                               (f"signal {snr:.1f} dB; " if snr is not None else "") + "hold still, or this is a print"))
 
     # Vibration: informational until thresholds are set from real-vs-attack captures.
     if vibration is not None:

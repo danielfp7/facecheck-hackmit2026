@@ -85,7 +85,7 @@ def analyze(rppg_meta: dict | None) -> dict:
     f_peak = float(f[band][np.argmax(spec[band])])
     # SNR (de Haan): power near the peak and its first harmonic vs the rest of the band.
     near = band & ((np.abs(f - f_peak) <= 0.12) | (np.abs(f - 2 * f_peak) <= 0.12))
-    snr_db = float(10 * np.log10(spec[near].sum() / max(spec[band & ~near].sum(), 1e-20)))
+    snr_db = float(10 * np.log10(max(spec[near].sum(), 1e-20) / max(spec[band & ~near].sum(), 1e-20)))
 
     # Motion is the main way this goes wrong: report how much the raw trace moved.
     motion = float(np.std(np.diff(trace_u.mean(axis=1))) / max(trace_u.mean(), 1e-9))

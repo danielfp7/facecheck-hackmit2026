@@ -19,6 +19,7 @@ meta.json schema (version 1):
 from __future__ import annotations
 
 import json
+import struct
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,6 +27,60 @@ import cv2
 import numpy as np
 
 SMALL_W = 160  # width of the downscaled frames kept in memory
+
+
+class JpegSequence:
+    """Frames the browser client captures itself: repeated [uint32 LE length][JPEG].
+
+    A browser can't hand over a video file whose frames map 1:1 to capture timestamps,
+    so the web app grabs each camera frame with its timestamp and packs them like this.
+    Mimics the part of cv2.VideoCapture the pipeline uses.
+    """
+
+    def __init__(self, path):
+        self.blob = Path(path).read_bytes()
+        self.index: list[tuple[int, int]] = []
+        i = 0
+        while i + 4 <= len(self.blob):
+            (n,) = struct.unpack_from("<I", self.blob, i)
+            i += 4
+            if n == 0 or i + n > len(self.blob):
+                break
+            self.index.append((i, n))
+            i += n
+        self.pos = 0
+        self._size = None
+
+    def isOpened(self) -> bool:
+        return bool(self.index)
+
+    def read(self):
+        if self.pos >= len(self.index):
+            return False, None
+        off, n = self.index[self.pos]
+        self.pos += 1
+        img = cv2.imdecode(np.frombuffer(self.blob, np.uint8, n, off), cv2.IMREAD_COLOR)
+        return (img is not None), img
+
+    def get(self, prop):
+        if self._size is None:
+            keep, self.pos = self.pos, 0
+            ok, img = self.read()
+            self.pos = keep
+            self._size = (img.shape[1], img.shape[0]) if ok else (0, 0)
+        if prop == cv2.CAP_PROP_FRAME_WIDTH:
+            return self._size[0]
+        if prop == cv2.CAP_PROP_FRAME_HEIGHT:
+            return self._size[1]
+        return 0
+
+    def release(self):
+        pass
+
+
+def open_frames(path):
+    """cv2.VideoCapture for video files, JpegSequence for the web client's .bin container."""
+    return JpegSequence(path) if str(path).endswith(".bin") else cv2.VideoCapture(str(path))
 
 
 @dataclass
@@ -54,7 +109,7 @@ class Bundle:
         box = (x, y, w, h) in source pixels. Returns (N, h, w, 3) float32 RGB 0..1.
         """
         x, y, w, h = box
-        cap = cv2.VideoCapture(str(self.video_path))
+        cap = open_frames(self.video_path)
         out = []
         while len(out) < self.n:
             ok, frame = cap.read()
@@ -71,7 +126,7 @@ def load(video_path: str | Path, meta: dict | str | Path) -> Bundle:
     if not isinstance(meta, dict):
         meta = json.loads(Path(meta).read_text())
 
-    cap = cv2.VideoCapture(str(video_path))
+    cap = open_frames(video_path)
     if not cap.isOpened():
         raise ValueError(f"cannot open video: {video_path}")
     W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))

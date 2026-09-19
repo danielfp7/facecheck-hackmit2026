@@ -56,7 +56,7 @@ Where things stand: the app builds with Xcode 27 and runs on an iPhone 14 Pro, a
 | Path | What |
 | --- | --- |
 | `server/` | FastAPI + signal processing (`signals/`: `lag`, `cornea`, `continuity`, `identity`, `rppg`, `vibration`; `verdict.py`) |
-| `web/` | Demo relying-party page ("Demo Bank" sign-in) served at `/` |
+| `web/` | Demo relying-party page ("Demo Bank" sign-in) served at `/`; `web/app/` is the webcam client served at `/app/` |
 | `ios/` | Swift app. `project.yml` → Xcode project via XcodeGen |
 | `tools/mac_capture.py` | Mac webcam stand-in for the phone; also the injection/lag attack simulator |
 | `tools/replay.py` | Re-scores saved captures; sets thresholds and the per-device lag baseline |
@@ -79,6 +79,27 @@ uv run --project server tools/mac_capture.py --synthetic --lag-ms 60     # genui
 uv run --project server tools/mac_capture.py --synthetic --lag-ms 260    # delayed attacker
 uv run --project server tools/mac_capture.py --synthetic --flat          # flat-screen reflection
 ```
+
+## Web app (computer + webcam)
+
+The same product in a browser, served by the same server: open <http://localhost:8000/app/> in Chrome. Enroll, then either **Run a test check** or press **Sign in** on the demo page at <http://localhost:8000> and approve it in the web app. Accounts are shared with the phone: enroll on either, verify on either.
+
+Flow: selfie at your normal distance → lean in to about 10 inches (25 cm) while the move is watched → full-screen flashes → 8 s pulse window → results tiles.
+
+What a browser changes, and how it is handled:
+
+| Limitation | Handling |
+| --- | --- |
+| No video file with exact per-frame timestamps | The page grabs every camera frame with its capture time (`requestVideoFrameCallback`) and uploads them as `[uint32 length][JPEG]`; the server reads that like a video (`bundle.JpegSequence`) |
+| Exposure usually can't be locked | The lag check switches to chromaticity with a full color-mixing fit; tested against simulated auto-exposure |
+| Wide screen, no vertical room | Shapes go left / middle / right and are sized from the screen height; the server scores the reflection along x |
+| Can't force brightness | The page asks for maximum brightness; a dim room helps |
+| No haptics or motion sensors | No vibration check |
+| Slower, more variable camera pipeline | Default lag baseline 130 ms for `web-*` devices; calibrate with `tools/replay.py --set-baseline` after a few genuine runs |
+
+The eye reflection is the hard part on a laptop: at normal sitting distance it is only ~4 px, which is why the app asks you to lean in. A 1080p webcam is needed; at 720p it is marginal. Works over `http://localhost`; from another machine browsers require HTTPS for camera access (use a `cloudflared` tunnel).
+
+Verified so far with headless Chrome and a fake camera (flow, upload, server parsing, results page). Not yet run with a real face.
 
 ## Build the phone app
 
