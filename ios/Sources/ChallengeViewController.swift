@@ -84,6 +84,8 @@ final class ChallengeViewController: UIViewController {
             await capture.settleAndLock(settleSeconds: max(challenge.settleS, 0.6))
             guard !finished else { return }
             capture.startRecording()
+            // Transit frames overlap the video's first frames, so the two join without a hole.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [capture] in capture.stopTransit() }
             motion.start()
             let link = CADisplayLink(target: self, selector: #selector(tick(_:)))
             link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)

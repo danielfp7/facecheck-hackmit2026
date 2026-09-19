@@ -19,7 +19,9 @@ from pydantic import BaseModel
 import bundle as bundle_mod
 import challenge as challenge_mod
 import verdict as verdict_mod
-from signals import continuity, cornea, identity, lag, rppg, vibration
+import cv2
+
+from signals import continuity, cornea, identity, lag, rppg, transit, vibration
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
@@ -123,7 +125,7 @@ def new_challenge(req: ChallengeRequest | None = None):
 
 
 def run_pipeline(video: Path, meta: dict, ch: challenge_mod.Challenge,
-                 selfie: bytes | None, user: str | None) -> dict:
+                 selfie: bytes | None, user: str | None, transit_blob: bytes | None = None) -> dict:
     b = bundle_mod.load(video, meta)
     lag_r = lag.analyze(b, ch)
     stash: dict = {}
@@ -144,20 +146,28 @@ def run_pipeline(video: Path, meta: dict, ch: challenge_mod.Challenge,
             ident = {"similarity": identity.similarity(selfie_emb, enrolled_emb)}
 
     cont_r = continuity.analyze(stash, selfie_emb, enrolled_emb) if selfie else None
+    transit_r = None
+    if transit_blob:
+        cap = cv2.VideoCapture(str(video))
+        ok, first = cap.read()
+        cap.release()
+        transit_r = transit.analyze(transit.unpack(transit_blob), meta.get("transit_ts", []), selfie_emb,
+                                    first if ok else None, float(b.ts[0]))
     stash.clear()                                   # frames are large
     rppg_r = rppg.analyze(meta.get("rppg")) if "rppg" in meta else None
     vib_r = vibration.analyze(b) if meta.get("haptics") else None
 
     out = verdict_mod.decide(lag_r, cornea_r, ident, meta, SHAPE_MODE,
-                             continuity=cont_r, rppg=rppg_r, vibration=vib_r)
-    out["signals"] = {"lag": lag_r, "cornea": cornea_r, "identity": ident,
-                      "continuity": cont_r, "rppg": rppg_r, "vibration": vib_r}
+                             continuity=cont_r, rppg=rppg_r, vibration=vib_r, transit=transit_r)
+    out["signals"] = {"lag": lag_r, "cornea": cornea_r, "identity": ident, "continuity": cont_r,
+                      "transit": transit_r, "rppg": rppg_r, "vibration": vib_r}
     return out
 
 
 @app.post("/verify")
 def verify(challenge_id: str = Form(...), meta: str = Form(...), video: UploadFile = File(...),
-           selfie: UploadFile | None = File(None), user: str | None = Form(None),
+           selfie: UploadFile | None = File(None), transit: UploadFile | None = File(None),
+           user: str | None = Form(None),
            request_id: str | None = Form(None), label: str | None = Form(None)):
     entry = challenges.pop(challenge_id, None)   # one-time use
     if entry is None or time.time() - entry[0] > CHALLENGE_TTL_S:
@@ -177,9 +187,12 @@ def verify(challenge_id: str = Form(...), meta: str = Form(...), video: UploadFi
     selfie_bytes = selfie.file.read() if selfie else None
     if selfie_bytes:
         (cap_dir / "selfie.jpg").write_bytes(selfie_bytes)
+    transit_bytes = transit.file.read() if transit else None
+    if transit_bytes:
+        (cap_dir / "transit.bin").write_bytes(transit_bytes)
 
     t0 = time.time()
-    result = run_pipeline(vpath, meta_d, ch, selfie_bytes, user)
+    result = run_pipeline(vpath, meta_d, ch, selfie_bytes, user, transit_bytes)
     result["processing_s"] = round(time.time() - t0, 2)
     result["capture"] = cap_dir.name
     (cap_dir / "result.json").write_text(json.dumps(result))

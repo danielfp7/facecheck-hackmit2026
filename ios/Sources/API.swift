@@ -75,7 +75,7 @@ struct API {
         _ = try await send(form.request(to: try url("/enroll")))
     }
 
-    func verify(challengeID: String, metaJSON: Data, video: URL, selfie: Data?, user: String,
+    func verify(challengeID: String, metaJSON: Data, video: URL, selfie: Data?, transit: Data?, user: String,
                 requestID: String?, label: String) async throws -> VerifyResult {
         var form = Multipart()
         form.field("challenge_id", challengeID)
@@ -85,6 +85,7 @@ struct API {
         if let requestID { form.field("request_id", requestID) }
         form.file("video", filename: "video.mov", mime: "video/quicktime", data: try Data(contentsOf: video))
         if let selfie { form.file("selfie", filename: "selfie.jpg", mime: "image/jpeg", data: selfie) }
+        if let transit { form.file("transit", filename: "transit.bin", mime: "application/octet-stream", data: transit) }
         var req = form.request(to: try url("/verify"))
         req.timeoutInterval = 120
         return try decoder.decode(VerifyResult.self, from: try await send(req))

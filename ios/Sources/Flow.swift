@@ -138,6 +138,7 @@ final class Flow: ObservableObject {
             } else {
                 selfie = jpeg
                 selfieTS = CACurrentMediaTime()
+                capture.startTransit()      // keep watching while the phone moves in to the eye
                 step = .position
             }
             busy = false
@@ -195,9 +196,12 @@ final class Flow: ObservableObject {
         ]
         var fullMeta = meta
         if let rppg = b.rppg { fullMeta["rppg"] = rppg }
+        let transit = await capture.takeTransit()
+        fullMeta["transit_ts"] = transit.ts
         do {
             let json = try JSONSerialization.data(withJSONObject: fullMeta)
             result = try await api.verify(challengeID: ch.id, metaJSON: json, video: b.videoURL, selfie: selfie,
+                                          transit: transit.blob.isEmpty ? nil : transit.blob,
                                           user: userName, requestID: request?.id, label: label)
             try? FileManager.default.removeItem(at: b.videoURL)
             capture.stop()
@@ -207,6 +211,7 @@ final class Flow: ObservableObject {
     }
 
     func reset() {
+        capture.stopTransit()
         capture.stop()
         request = nil; challenge = nil; result = nil; selfie = nil; selfieTS = nil
         step = .home

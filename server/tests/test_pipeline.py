@@ -160,3 +160,45 @@ def test_vibration_injected_video_ignores_phone():
     from signals import vibration
     r = vibration.score(*_vibration_case(video_follows=False))
     assert r["imu_detected"] == 3 and r["video_detected"] == 0 and r["motion_corr"] < 0.3
+
+
+# ---------- transit: the move from the selfie to the eye ----------
+
+def _texture(seed, size=900):
+    import cv2, numpy as np
+    rng = np.random.default_rng(seed)
+    img = cv2.GaussianBlur(rng.random((size, size, 3)).astype(np.float32), (0, 0), 2.0)
+    img = (img - img.min()) / (img.max() - img.min())
+    return (img * 255).astype(np.uint8)
+
+
+def _move_in(tex, n, z0=1.0, z1=2.2):
+    import cv2, numpy as np
+    out = []
+    for u in np.linspace(0, 1, n):
+        z = z0 * (z1 / z0) ** u
+        w, h = int(480 / z), int(640 / z)
+        x0 = (tex.shape[1] - w) // 2 + int(6 * np.sin(5 * u)); y0 = (tex.shape[0] - h) // 2 + int(5 * np.cos(4 * u))
+        out.append(cv2.resize(tex[y0:y0 + h, x0:x0 + w], (480, 640), interpolation=cv2.INTER_AREA))
+    return out
+
+
+def test_transit_continuous_move_has_no_cut():
+    from signals import transit
+    frames = _move_in(_texture(1), 30)
+    r = transit.analyze(frames, [i * 0.1 for i in range(30)], None)
+    assert r["ok"] and r["cuts"] == 0 and r["worst_gap_s"] < 0.2
+
+
+def test_transit_detects_a_jump_to_another_scene():
+    from signals import transit
+    frames = _move_in(_texture(1), 15, 1.0, 1.5) + _move_in(_texture(2), 15, 1.5, 2.2)
+    r = transit.analyze(frames, [i * 0.1 for i in range(30)], None)
+    assert r["cuts"] == 1 and abs(r["cut_at_s"][0] - 1.5) < 0.11
+
+
+def test_transit_flags_missing_frames():
+    from signals import transit
+    ts = [i * 0.1 for i in range(15)] + [3.0 + i * 0.1 for i in range(15)]
+    r = transit.analyze(_move_in(_texture(1), 30), ts, None)
+    assert r["worst_gap_s"] > 1.0

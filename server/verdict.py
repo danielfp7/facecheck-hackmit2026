@@ -28,6 +28,8 @@ THRESHOLDS = {
     # 0.43-0.67, strangers <= 0.09.
     "continuity_min": 0.25,
     "max_selfie_to_check_s": 25.0,
+    "transit_max_gap_s": 0.6,     # frames arrive every 0.1 s; a hole means the camera view was not continuous
+    "transit_max_blur_s": 1.0,
     "rppg_snr_db_min": 2.0,
 }
 
@@ -45,7 +47,8 @@ def _tile(name: str, status: str, headline: str, detail: str = "") -> dict:
 
 
 def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str = "auto",
-           continuity: dict | None = None, rppg: dict | None = None, vibration: dict | None = None) -> dict:
+           continuity: dict | None = None, rppg: dict | None = None, vibration: dict | None = None,
+           transit: dict | None = None) -> dict:
     """shape_mode: 'auto' scores the outline only when the reflection is large enough to
     read it; 'shape' always does; 'layout' never does (position + color only)."""
     T = THRESHOLDS
@@ -137,8 +140,34 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
             tiles.append(_tile("Continuity", "red", f"{continuity['similarity']:.2f}",
                                f"eye-check frames vs selfie, needs {T['continuity_min']:.2f}"))
         else:
-            tiles.append(_tile("Continuity", "green", f"{continuity['similarity']:.2f}",
-                               f"same person in selfie and eye check ({continuity['frames']} frames)"))
+            detail = f"same person in selfie and eye check ({continuity['frames']} frames)"
+            status = "green"
+            if transit is not None and transit.get("ok"):
+                detail += (f"; watched {transit['frames']} frames of the move, face matched in "
+                           f"{transit['faces_seen']}, no jumps" if not transit["cuts"] else "")
+                if not transit["identity_held"] and not transit["stranger_frames"]:
+                    status = "yellow"
+            tiles.append(_tile("Continuity", status, f"{continuity['similarity']:.2f}", detail))
+
+    # Transit: the move from the selfie to the eye, watched frame by frame.
+    if transit is not None:
+        if not transit.get("ok"):
+            unverifiable.append(transit.get("reason", "the move to the eye was not recorded"))
+        elif transit["stranger_frames"] > 0:
+            failures.append("a different face appeared between the selfie and the eye check")
+        elif transit["cuts"] > 0:
+            failures.append(f"the camera view jumped {transit['cut_at_s'][0]:.1f} s after the selfie (not one continuous move)")
+        elif transit["worst_gap_s"] > T["transit_max_gap_s"]:
+            failures.append(f"{transit['worst_gap_s']:.1f} s of camera frames are missing between the selfie and the eye check")
+        elif transit["faces_seen"] < 2:
+            unverifiable.append("no face was visible right after the selfie")
+        elif transit["longest_blur_s"] > T["transit_max_blur_s"]:
+            unverifiable.append("the move to the eye was too fast to follow; bring the phone in steadily")
+        if transit.get("ok") and any(t["name"] == "Continuity" for t in tiles) and (
+                transit["stranger_frames"] or transit["cuts"] or transit["worst_gap_s"] > T["transit_max_gap_s"]):
+            for t in tiles:
+                if t["name"] == "Continuity":
+                    t.update(status="red", headline="Broken", detail=failures[-1])
 
     # Heartbeat: shown, never decisive. It catches prints and masks only; a replay or a
     # good face swap carries the filmed person's real pulse.

@@ -43,6 +43,13 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
     private var sampleTS: [Double] = []
     private var sampleRGB: [[[Double]]] = []
     static let gridRows = 6, gridCols = 4
+    // Transit: small frames from the selfie until the flashes start, so the server can
+    // watch the move to the eye as one continuous shot.
+    private var transitOn = false
+    private var transitBlob = Data()
+    private var transitTS: [Double] = []
+    private var lastTransit = 0.0
+    static let transitInterval = 0.1, transitWidth: CGFloat = 480, transitMaxFrames = 260
 
     private(set) var fps: Double = 30
 
@@ -263,6 +270,48 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
         }
     }
 
+    // MARK: Transit frames
+
+    func startTransit() {
+        queue.async {
+            self.transitBlob = Data()
+            self.transitTS = []
+            self.lastTransit = 0
+            self.transitOn = true
+        }
+    }
+
+    func stopTransit() {
+        queue.async { self.transitOn = false }
+    }
+
+    /// Frames packed as repeated [uint32 little-endian length][JPEG], plus their timestamps.
+    func takeTransit() async -> (blob: Data, ts: [Double]) {
+        await withCheckedContinuation { cont in
+            queue.async {
+                self.transitOn = false
+                cont.resume(returning: (self.transitBlob, self.transitTS))
+                self.transitBlob = Data()
+                self.transitTS = []
+            }
+        }
+    }
+
+    private func appendTransit(_ pixels: CVPixelBuffer, at ts: Double) {
+        guard transitTS.count < CaptureController.transitMaxFrames else { return }
+        let image = CIImage(cvPixelBuffer: pixels)
+        let scale = CaptureController.transitWidth / image.extent.width
+        let small = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        guard let jpeg = ciContext.jpegRepresentation(
+            of: small, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+            options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.65]) else { return }
+        var n = UInt32(jpeg.count).littleEndian
+        withUnsafeBytes(of: &n) { transitBlob.append(contentsOf: $0) }
+        transitBlob.append(jpeg)
+        transitTS.append(ts)
+        lastTransit = ts
+    }
+
     // MARK: Heartbeat sampling
 
     func startSampling() {
@@ -356,6 +405,11 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
                                                     options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.9])
             selfieWaiters.forEach { $0(data) }
             selfieWaiters = []
+        }
+
+        if transitOn {
+            let ts = hostSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
+            if ts - lastTransit >= CaptureController.transitInterval - 0.004 { appendTransit(pixels, at: ts) }
         }
 
         if sampling {
