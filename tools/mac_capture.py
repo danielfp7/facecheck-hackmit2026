@@ -44,10 +44,14 @@ def load_swapper(source_path: str):
     model = Path(__file__).resolve().parents[1] / "attack/Deep-Live-Cam/models/inswapper_128_fp16.onnx"
     if not model.exists():
         sys.exit(f"missing {model}; run attack/setup.sh first")
-    fa = FaceAnalysis(name="buffalo_l", providers=["CoreMLExecutionProvider", "CPUExecutionProvider"])
+    providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+    # The source face needs a full analysis once; per frame the swapper only needs detection.
+    full = FaceAnalysis(name="buffalo_l", providers=providers)
+    full.prepare(ctx_id=0, det_size=(640, 640))
+    fa = FaceAnalysis(name="buffalo_l", providers=providers, allowed_modules=["detection"])
     fa.prepare(ctx_id=0, det_size=(640, 640))
-    swapper = insightface.model_zoo.get_model(str(model), providers=["CoreMLExecutionProvider", "CPUExecutionProvider"])
-    src_faces = fa.get(cv2.imread(source_path))
+    swapper = insightface.model_zoo.get_model(str(model), providers=providers)
+    src_faces = full.get(cv2.imread(source_path))
     if not src_faces:
         sys.exit("no face in --swap-source image")
     src = src_faces[0]

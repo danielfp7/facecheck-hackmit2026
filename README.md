@@ -104,17 +104,37 @@ uv run --project server tools/replay.py                  # compare rows, then ed
 
 If the phone's front camera is fixed-focus (iPhone 13 and earlier) the shape outline blurs at 3 inches. Run the server with `INHUMAN_SHAPE_MODE=layout` to score shape position + color instead of the outline.
 
-## Attack rig
+## Testing with a deepfake
+
+Only swap faces of teammates who have agreed to it. Call the enrolled person the *victim* and the person at the keyboard the *attacker*. You need one clear, front-facing photo of the victim; their selfie from a saved capture works (`server/data/captures/<run>/selfie.jpg`).
+
+**Start the live face swap**
 
 ```sh
-attack/setup.sh
+attack/setup.sh      # once; downloads ~600 MB of models
 cd attack/Deep-Live-Cam && .venv/bin/python run.py --execution-provider coreml --live-mirror --live-resizable
 ```
 
-- **Presentation attack:** swap fullscreen on the Mac and point the phone at it. Expected to fail Check 2 (reflection not cornea-sized) and Check 1 (no diffuse response).
-- **Injection / lag attack:** an iPhone's camera can't be fed fake frames, so the pipeline delay is measured on the Mac: `tools/mac_capture.py --swap-source victim.jpg` runs the real inswapper per frame and stamps frames on arrival. `--attack-delay-ms N` adds a fixed delay instead.
+In its window: **Select a face** → the victim's photo, then **Live**. macOS will ask for camera access for the terminal the first time. Make the preview as large as it goes, turn the Mac's brightness to maximum, and sit so the swapped face is roughly life-size. Expect single-digit fps on this Mac.
 
-Only swap faces of teammates who have agreed to it.
+**Attack 1: deepfake on a screen** (label `screen-attack`). The attacker sits at the Mac wearing the victim's face. On the phone choose the label, **Run a test check**, take the selfie *of the Mac screen*, then move the phone in to the on-screen eye as the app asks. Expected: the face match may well pass, since that is the point of a deepfake. It should then fail on **Eye reflection** (a flat screen has no cornea-sized reflection inside an iris) and probably on **Light response** (a glowing screen doesn't take on the phone's colors the way skin does).
+
+**Attack 2: deepfake for the selfie, real eye for the check** (label `screen-attack`). Take the selfie of the Mac screen, then turn the phone to the attacker's own real eye. Expected: **Continuity** fails, with "the camera view jumped", "a different face appeared", or "the face in the eye check is not the person in the selfie".
+
+**Attack 3: leave and come back.** After the selfie, swipe out of the app. Expected: the check is cancelled on the phone.
+
+**Attack 4: injected video, for the lag number.** An iPhone's camera can't be fed fake frames without a jailbreak, so this runs on the Mac's webcam, where every frame goes through the real swap model and is stamped when it would reach the app:
+
+```sh
+uv run --project server tools/mac_capture.py --user <victim> --label mac-real                     # baseline, no swap
+uv run --project server tools/mac_capture.py --user <victim> --swap-source victim.jpg --label dlc-attack
+```
+
+Compare the **lag** the two runs print. The swap costs about 236 ms per frame on this Mac against a limit of baseline + 100 ms, and the literature puts a full attacker pipeline at 150-300 ms. Neither Mac run can come back verified: a webcam at arm's length can't resolve the eye reflection. This one exists for the measured delay, which is the number for the pitch.
+
+**Controls, so a red result means something:** a genuine run by the victim (should verify), a genuine run by a teammate with glasses, a tablet replaying a recording of the victim (`replay`), and a printed photo (`print`).
+
+Afterwards, `uv run --project server tools/replay.py` prints one row per saved capture for the results table.
 
 ## Safety
 

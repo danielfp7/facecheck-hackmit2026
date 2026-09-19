@@ -226,14 +226,21 @@ struct PositionView: View {
                 .strokeBorder(.white.opacity(0.9), lineWidth: 3)
                 .frame(width: 260, height: 150)
             VStack {
-                Text("Hold the phone \(inches) inches from your face, with one eye inside the outline")
-                    .font(.headline).multilineTextAlignment(.center).padding(12)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                    .padding([.top, .horizontal], 24)
+                VStack(spacing: 6) {
+                    Text("Keep the camera on your face")
+                        .font(.title2.bold())
+                    Text("Without lowering the phone, slowly bring it to about \(inches) inches from one eye, with that eye inside the outline.")
+                        .font(.subheadline)
+                    Text("The move is being watched. Looking away, covering the camera or leaving the app cancels the check.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .multilineTextAlignment(.center).padding(14)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .padding([.top, .horizontal], 20)
                 Spacer()
                 if let countdown {
                     Text("\(countdown)").font(.system(size: 96, weight: .bold)).foregroundStyle(.white)
-                    Text("Keep still and keep your eye open").foregroundStyle(.white)
+                    Text("Hold it right there. Keep still, eye open.").font(.headline).foregroundStyle(.white)
                 } else {
                     Button("I'm in position") { begin() }
                         .buttonStyle(.borderedProminent).controlSize(.large)
