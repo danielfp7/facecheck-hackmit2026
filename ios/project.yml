@@ -1,0 +1,42 @@
+# Generate the Xcode project with:  ios/bin/xcodegen/bin/xcodegen generate --spec ios/project.yml
+# (see ios/README.md). Regenerating is safe: signing and Info.plist keys live here.
+name: InHuman
+options:
+  bundleIdPrefix: com.hackmit
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: "8W48T3S92B"   # Daniel Pacheco (personal team); regenerating keeps it
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  InHuman:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hackmit.inhuman.danielpacheco
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: InHuman
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSCameraUsageDescription: InHuman films your face and eye while the screen flashes, to prove a live person is present.
+        NSLocalNetworkUsageDescription: InHuman sends the capture to the verification server on your local network.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
+        # Without this, ProMotion iPhones cap CADisplayLink at 60 Hz.
+        CADisableMinimumFrameDurationOnPhone: true

@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+server/data/
+attack/Deep-Live-Cam/
+xcuserdata/
+DerivedData/
+ios/bin/
+.pytest_cache/
+ios/build/
