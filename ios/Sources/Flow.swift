@@ -1,3 +1,5 @@
+import AVFoundation
+import QuartzCore
 import SwiftUI
 import UIKit
 
@@ -36,6 +38,38 @@ final class Flow: ObservableObject {
     let capture = CaptureController()
     var api: API { API(baseString: serverURL) }
     private var pollTask: Task<Void, Never>?
+
+    // Session lock: the selfie and the eye check must be one uninterrupted sitting, or an
+    // attacker could show a deepfake for the selfie and their own eye for the liveness check.
+    static let maxSelfieToCheckSeconds = 20.0
+    private var selfieTS: Double?
+    private var observers: [NSObjectProtocol] = []
+
+    init() {
+        let nc = NotificationCenter.default
+        for name in [AVCaptureSession.wasInterruptedNotification, AVCaptureSession.runtimeErrorNotification] {
+            observers.append(nc.addObserver(forName: name, object: capture.session, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.sessionBroken("The camera was interrupted.") }
+            })
+        }
+    }
+
+    /// True from the selfie until the capture is handed to the server.
+    var isLocked: Bool {
+        switch step {
+        case .selfie(let enrolling): return !enrolling
+        case .position, .challenge: return true
+        default: return false
+        }
+    }
+
+    /// Called when the app leaves the foreground or the camera is interrupted.
+    func sessionBroken(_ why: String) {
+        guard isLocked else { return }
+        capture.cancelRecording()
+        error = "\(why) The selfie and the eye check have to happen in one go, so this check was cancelled. Start again."
+        reset()
+    }
 
     // MARK: Polling (stands in for a push notification)
 
@@ -103,6 +137,7 @@ final class Flow: ObservableObject {
                 } catch { fail(error) }
             } else {
                 selfie = jpeg
+                selfieTS = CACurrentMediaTime()
                 step = .position
             }
             busy = false
@@ -110,6 +145,11 @@ final class Flow: ObservableObject {
     }
 
     func startChallenge() {
+        if let t = selfieTS, CACurrentMediaTime() - t > Flow.maxSelfieToCheckSeconds {
+            error = "Too long passed since the selfie. Start again and go straight to the eye check."
+            reset()
+            return
+        }
         busy = true
         Task {
             do {
@@ -133,6 +173,13 @@ final class Flow: ObservableObject {
     private func upload(_ b: CaptureBundle) async {
         guard let ch = challenge else { return }
         let screen = Device.screenSizeMM()
+        let selfieAt: Double = selfieTS ?? 0
+        let challengeAt: Double = b.displayEvents.first?.ts ?? 0
+        let session: [String: Any] = [
+            "selfie_ts": selfieAt,
+            "challenge_start_ts": challengeAt,
+            "interruptions": 0,     // any interruption cancels the check before it gets here
+        ]
         let meta: [String: Any] = [
             "schema": 1,
             "challenge_id": ch.id,
@@ -143,10 +190,13 @@ final class Flow: ObservableObject {
             "camera": b.camera,
             "screen": ["brightness": 1.0, "width_mm": screen.width, "height_mm": screen.height],
             "distance_mm": capture.workingDistanceMM,
-            "imu": [], "haptics": [],
+            "imu": b.imu, "haptics": b.haptics,
+            "session": session,
         ]
+        var fullMeta = meta
+        if let rppg = b.rppg { fullMeta["rppg"] = rppg }
         do {
-            let json = try JSONSerialization.data(withJSONObject: meta)
+            let json = try JSONSerialization.data(withJSONObject: fullMeta)
             result = try await api.verify(challengeID: ch.id, metaJSON: json, video: b.videoURL, selfie: selfie,
                                           user: userName, requestID: request?.id, label: label)
             try? FileManager.default.removeItem(at: b.videoURL)
@@ -158,7 +208,7 @@ final class Flow: ObservableObject {
 
     func reset() {
         capture.stop()
-        request = nil; challenge = nil; result = nil; selfie = nil
+        request = nil; challenge = nil; result = nil; selfie = nil; selfieTS = nil
         step = .home
     }
 

@@ -19,7 +19,7 @@ from pydantic import BaseModel
 import bundle as bundle_mod
 import challenge as challenge_mod
 import verdict as verdict_mod
-from signals import cornea, identity, lag
+from signals import continuity, cornea, identity, lag, rppg, vibration
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
@@ -126,21 +126,32 @@ def run_pipeline(video: Path, meta: dict, ch: challenge_mod.Challenge,
                  selfie: bytes | None, user: str | None) -> dict:
     b = bundle_mod.load(video, meta)
     lag_r = lag.analyze(b, ch)
-    cornea_r = cornea.analyze(b, ch, lag_r["lag_ms"]) if lag_r.get("ok") else {"ok": False, "reason": "skipped: no light response"}
+    stash: dict = {}
+    cornea_r = (cornea.analyze(b, ch, lag_r["lag_ms"], stash=stash) if lag_r.get("ok")
+                else {"ok": False, "reason": "skipped: no light response"})
 
     ident = {"similarity": None, "reason": "no selfie uploaded"}
+    selfie_emb = enrolled_emb = None
     if selfie:
         ref = USERS / f"{user}.npy" if user else None
-        emb = identity.embed(selfie)
-        if emb is None:
+        selfie_emb = identity.embed(selfie)
+        if selfie_emb is None:
             ident = {"similarity": None, "reason": "no face found in the selfie"}
         elif ref is None or not ref.exists():
             ident = {"similarity": None, "reason": "user is not enrolled"}
         else:
-            ident = {"similarity": identity.similarity(emb, np.load(ref))}
+            enrolled_emb = np.load(ref)
+            ident = {"similarity": identity.similarity(selfie_emb, enrolled_emb)}
 
-    out = verdict_mod.decide(lag_r, cornea_r, ident, meta, SHAPE_MODE)
-    out["signals"] = {"lag": lag_r, "cornea": cornea_r, "identity": ident}
+    cont_r = continuity.analyze(stash, selfie_emb, enrolled_emb) if selfie else None
+    stash.clear()                                   # frames are large
+    rppg_r = rppg.analyze(meta.get("rppg")) if "rppg" in meta else None
+    vib_r = vibration.analyze(b) if meta.get("haptics") else None
+
+    out = verdict_mod.decide(lag_r, cornea_r, ident, meta, SHAPE_MODE,
+                             continuity=cont_r, rppg=rppg_r, vibration=vib_r)
+    out["signals"] = {"lag": lag_r, "cornea": cornea_r, "identity": ident,
+                      "continuity": cont_r, "rppg": rppg_r, "vibration": vib_r}
     return out
 
 

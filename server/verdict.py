@@ -24,6 +24,11 @@ THRESHOLDS = {
     "color_score_min": 0.5,
     "face_similarity_min": 0.35,
     "max_dropped_frames": 6,
+    # Partial face in the eye-check frames vs the selfie. Measured: same person
+    # 0.43-0.67, strangers <= 0.09.
+    "continuity_min": 0.25,
+    "max_selfie_to_check_s": 25.0,
+    "rppg_snr_db_min": 2.0,
 }
 
 
@@ -39,7 +44,8 @@ def _tile(name: str, status: str, headline: str, detail: str = "") -> dict:
     return {"name": name, "status": status, "headline": headline, "detail": detail}
 
 
-def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str = "auto") -> dict:
+def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str = "auto",
+           continuity: dict | None = None, rppg: dict | None = None, vibration: dict | None = None) -> dict:
     """shape_mode: 'auto' scores the outline only when the reflection is large enough to
     read it; 'shape' always does; 'layout' never does (position + color only)."""
     T = THRESHOLDS
@@ -112,6 +118,53 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
         tiles.append(_tile("Face match", "red", f"{identity['similarity']:.2f}", f"needs {T['face_similarity_min']:.2f}"))
     else:
         tiles.append(_tile("Face match", "green", f"{identity['similarity']:.2f}", f"needs {T['face_similarity_min']:.2f}"))
+
+    # Continuity: the eye check must show the same person as the selfie, in one sitting.
+    session = meta.get("session")
+    if session:
+        gap = float(session.get("challenge_start_ts", 0)) - float(session.get("selfie_ts", 0))
+        if int(session.get("interruptions", 0)) > 0:
+            failures.append("the app was left or the camera was interrupted between the selfie and the eye check")
+        elif gap > T["max_selfie_to_check_s"] or gap < 0:
+            failures.append(f"too long between the selfie and the eye check ({gap:.0f} s)")
+    if continuity is not None:
+        if not continuity.get("ok"):
+            tiles.append(_tile("Continuity", "yellow", "Not checked", continuity.get("reason", "")))
+            if cornea.get("ok"):
+                unverifiable.append(continuity.get("reason", "continuity could not be checked"))
+        elif continuity["similarity"] < T["continuity_min"]:
+            failures.append("the face in the eye check is not the person in the selfie")
+            tiles.append(_tile("Continuity", "red", f"{continuity['similarity']:.2f}",
+                               f"eye-check frames vs selfie, needs {T['continuity_min']:.2f}"))
+        else:
+            tiles.append(_tile("Continuity", "green", f"{continuity['similarity']:.2f}",
+                               f"same person in selfie and eye check ({continuity['frames']} frames)"))
+
+    # Heartbeat: shown, never decisive. It catches prints and masks only; a replay or a
+    # good face swap carries the filmed person's real pulse.
+    if rppg is not None:
+        if not rppg.get("ok"):
+            tiles.append(_tile("Heartbeat", "yellow", "Not measured", rppg.get("reason", "")))
+        elif rppg["snr_db"] >= T["rppg_snr_db_min"]:
+            tiles.append(_tile("Heartbeat", "green", f"{rppg['bpm']:.0f} bpm", f"signal {rppg['snr_db']:.1f} dB; weak evidence on its own"))
+        else:
+            tiles.append(_tile("Heartbeat", "yellow", "No clear pulse", f"signal {rppg['snr_db']:.1f} dB; hold still, or this is a print"))
+
+    # Vibration: informational until thresholds are set from real-vs-attack captures.
+    if vibration is not None:
+        if not vibration.get("ok"):
+            tiles.append(_tile("Vibration", "yellow", "Not measured", vibration.get("reason", "")))
+        else:
+            n = vibration["n_bursts"]
+            detail = f"sensor felt {vibration['imu_detected']}/{n}, camera saw {vibration['video_detected']}/{n}"
+            if vibration.get("motion_corr") is not None:
+                detail += f", video-gyro agreement {vibration['motion_corr']:.2f}"
+            if vibration["imu_detected"] < max(1, n - 1):
+                tiles.append(_tile("Vibration", "yellow", "Bursts not felt", detail))
+            elif vibration["video_detected"] >= max(1, n - 1) or (vibration.get("motion_corr") or 0) >= 0.5:
+                tiles.append(_tile("Vibration", "green", "Camera moves with phone", detail))
+            else:
+                tiles.append(_tile("Vibration", "yellow", "Camera didn't follow", detail))
 
     if failures:
         verdict, reason = "unverified", failures[0]

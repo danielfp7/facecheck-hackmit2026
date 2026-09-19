@@ -92,3 +92,71 @@ def test_verdicts(cases, ch, name, expected, needle):
     v = verdict.decide(l, c, {"similarity": 0.8}, meta)
     assert v["verdict"] == expected, v
     assert needle in v["reason"]
+
+
+# ---------- heartbeat + vibration (pure signal tests, no video) ----------
+
+def _rppg_meta(bpm=72.0, pulse_amp=0.004, seconds=8.0, fps=60, seed=1):
+    import numpy as np
+    rng = np.random.default_rng(seed)
+    t = 500.0 + np.arange(int(seconds * fps)) / fps
+    skin = np.array([0.62, 0.45, 0.38])
+    beat = np.sin(2 * np.pi * bpm / 60 * t)
+    # Blood volume changes absorb green most, then blue, then red.
+    cells = []
+    for c in range(24):
+        base = skin * (0.85 + 0.3 * rng.random())
+        cells.append(base * (1 + pulse_amp * beat[:, None] * np.array([0.35, 1.0, 0.6])) + rng.normal(0, 0.0012, (len(t), 3)))
+    rgb = np.stack(cells, axis=1)
+    rgb[:, 0] = [0.02, 0.02, 0.03]          # a dark background cell
+    rgb[:, 1] = [0.99, 0.99, 0.99]          # a clipped cell
+    return {"t": t.tolist(), "grid": [6, 4], "rgb": rgb.tolist()}
+
+
+def test_rppg_recovers_heart_rate():
+    from signals import rppg
+    r = rppg.analyze(_rppg_meta(bpm=72))
+    assert r["ok"] and abs(r["bpm"] - 72) < 4 and r["snr_db"] > 3
+
+
+def test_rppg_print_has_no_pulse():
+    from signals import rppg
+    live = rppg.analyze(_rppg_meta(bpm=72))
+    flat = rppg.analyze(_rppg_meta(pulse_amp=0.0))
+    assert flat["ok"] and flat["snr_db"] < live["snr_db"] - 6
+
+
+def _vibration_case(video_follows: bool, seed=2):
+    import numpy as np
+    rng = np.random.default_rng(seed)
+    it = 100.0 + np.arange(0, 5.5, 0.01)
+    gyro = np.stack([0.05 * np.sin(2 * np.pi * 1.3 * it), 0.04 * np.sin(2 * np.pi * 0.8 * it + 1), 0 * it], axis=1)
+    gyro += rng.normal(0, 0.002, gyro.shape)
+    accel = rng.normal(0, 0.003, (len(it), 3))
+    haptics = [{"ts": 101.2, "duration_s": 0.15}, {"ts": 102.9, "duration_s": 0.15}, {"ts": 104.4, "duration_s": 0.15}]
+    for h in haptics:
+        sel = (it >= h["ts"]) & (it <= h["ts"] + 0.15)
+        accel[sel] += rng.normal(0, 0.08, (sel.sum(), 3))
+    ft = 100.0 + np.arange(0, 5.5, 1 / 60)
+    f_px = 1280.0
+    shifts = rng.normal(0, 0.03, (len(ft), 2))
+    if video_follows:
+        gy = np.stack([np.interp(ft, it, gyro[:, k]) for k in range(2)], axis=1)
+        shifts += gy[:, ::-1] * f_px / 60 * np.array([1.0, -1.0])     # arbitrary axis convention
+        for h in haptics:
+            sel = (ft >= h["ts"]) & (ft <= h["ts"] + 0.15)
+            shifts[sel] += rng.normal(0, 0.35, (sel.sum(), 2))
+    imu = {"t": it.tolist(), "gyro": gyro.tolist(), "accel": accel.tolist()}
+    return ft, shifts, imu, haptics, f_px
+
+
+def test_vibration_genuine_camera_moves_with_phone():
+    from signals import vibration
+    r = vibration.score(*_vibration_case(video_follows=True))
+    assert r["ok"] and r["imu_detected"] == 3 and r["video_detected"] >= 2 and r["motion_corr"] > 0.7
+
+
+def test_vibration_injected_video_ignores_phone():
+    from signals import vibration
+    r = vibration.score(*_vibration_case(video_follows=False))
+    assert r["imu_detected"] == 3 and r["video_detected"] == 0 and r["motion_corr"] < 0.3

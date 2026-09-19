@@ -16,6 +16,7 @@ struct InHumanApp: App {
 
 struct RootView: View {
     @EnvironmentObject var flow: Flow
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -33,6 +34,10 @@ struct RootView: View {
             case .uploading: UploadingView()
             case .results: ResultsView()
             }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Leaving the app (or even pulling down Control Center) mid-check cancels it.
+            if phase != .active { flow.sessionBroken("You left the app.") }
         }
         .alert("Something went wrong", isPresented: Binding(get: { flow.error != nil }, set: { if !$0 { flow.error = nil } })) {
             Button("OK", role: .cancel) {}

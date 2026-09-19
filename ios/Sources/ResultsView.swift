@@ -16,6 +16,10 @@ struct ResultsView: View {
                                 if let plot = r.signals?.lag?.plot { LightResponseChart(plot: plot) }
                             case "Eye reflection":
                                 if let states = r.signals?.cornea?.states { EyeReflectionGrid(states: states) }
+                            case "Heartbeat":
+                                if let plot = r.signals?.rppg?.plot { PulseChart(plot: plot) }
+                            case "Vibration":
+                                if let plot = r.signals?.vibration?.plot { VibrationChart(plot: plot) }
                             case "Face match":
                                 if let data = flow.selfie, let img = UIImage(data: data) {
                                     Image(uiImage: img).resizable().scaledToFill()
@@ -130,6 +134,62 @@ struct LightResponseChart: View {
         .chartYAxis(.hidden)
         .chartLegend(.hidden)
         .frame(height: 130)
+    }
+}
+
+/// Filtered pulse waveform from the steady-white window.
+struct PulseChart: View {
+    let plot: RppgPlot
+
+    var body: some View {
+        Chart(Array(plot.t.indices), id: \.self) { i in
+            LineMark(x: .value("s", plot.t[i]), y: .value("pulse", plot.wave[i]))
+                .foregroundStyle(Color.pink)
+                .interpolationMethod(.catmullRom)
+        }
+        .chartYAxis(.hidden)
+        .frame(height: 100)
+    }
+}
+
+/// Shake felt by the motion sensor (blue) and seen by the camera (orange); dashed lines are the bursts.
+struct VibrationChart: View {
+    let plot: VibrationPlot
+
+    private struct Point: Identifiable {
+        let id: Int
+        let t: Double
+        let value: Double
+        let series: String
+    }
+
+    private var points: [Point] {
+        var out: [Point] = []
+        // The sensor runs at 100 Hz; every other sample is plenty for a small chart.
+        for i in stride(from: 0, to: plot.tImu.count, by: 2) {
+            out.append(Point(id: out.count, t: plot.tImu[i], value: plot.imu[i], series: "sensor"))
+        }
+        for i in plot.tVideo.indices {
+            out.append(Point(id: out.count, t: plot.tVideo[i], value: -plot.video[i], series: "camera"))
+        }
+        return out
+    }
+
+    var body: some View {
+        Chart {
+            ForEach(points) { p in
+                LineMark(x: .value("s", p.t), y: .value("shake", p.value), series: .value("series", p.series))
+                    .foregroundStyle(p.series == "sensor" ? Color.blue : Color.orange)
+            }
+            ForEach(plot.bursts, id: \.self) { b in
+                RuleMark(x: .value("burst", b))
+                    .foregroundStyle(Color.secondary)
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            }
+        }
+        .chartYAxis(.hidden)
+        .chartLegend(.hidden)
+        .frame(height: 110)
     }
 }
 

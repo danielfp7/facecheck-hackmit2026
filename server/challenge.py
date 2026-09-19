@@ -60,6 +60,14 @@ class Challenge:
     states: list[State] = field(default_factory=list)
     settle_color: str = "green"  # brightest state; phone locks exposure on it
     settle_s: float = 0.6
+    # Vibration test: haptic bursts at server-chosen offsets from the first state, so
+    # the timing can't be predicted or pre-rendered.
+    haptic_times_s: list[float] = field(default_factory=list)
+    haptic_duration_s: float = 0.15
+    # Heartbeat: steady soft white after the flashes. Below full white so screen-lit
+    # skin doesn't clip under the exposure that was locked on the settle color.
+    rppg_s: float = 8.0
+    rppg_level: float = 0.8
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -73,11 +81,24 @@ class Challenge:
         keys = ("index", "shape", "shape_color", "background", "position", "duration_s")
         states = [State(**{k: s[k] for k in keys}) for s in d["states"]]
         return cls(id=d["id"], nonce=d["nonce"], states=states,
-                   settle_color=d.get("settle_color", "green"), settle_s=d.get("settle_s", 0.6))
+                   settle_color=d.get("settle_color", "green"), settle_s=d.get("settle_s", 0.6),
+                   haptic_times_s=d.get("haptic_times_s", []),
+                   haptic_duration_s=d.get("haptic_duration_s", 0.15),
+                   rppg_s=d.get("rppg_s", 0.0), rppg_level=d.get("rppg_level", 0.8))
+
+
+def _haptic_times(rng: random.Random, total_s: float, n: int = 3, min_gap: float = 0.9) -> list[float]:
+    """n random burst times inside the sequence, at least min_gap apart."""
+    lo, hi = 0.5, total_s - 0.5
+    for _ in range(200):
+        ts = sorted(rng.uniform(lo, hi) for _ in range(n))
+        if all(b - a >= min_gap for a, b in zip(ts, ts[1:])):
+            return [round(t, 3) for t in ts]
+    return [round(lo + (hi - lo) * (i + 0.5) / n, 3) for i in range(n)]
 
 
 def generate(n_shapes: int = 7, state_s: float = 0.4, inverse: bool = False,
-             seed: str | None = None) -> Challenge:
+             seed: str | None = None, haptics: bool = True, rppg_s: float = 8.0) -> Challenge:
     """Random sequence: black, shape, shape, black, shape, ... about 4-5 s total.
 
     Consecutive shape states always differ in color so every transition produces
@@ -111,4 +132,7 @@ def generate(n_shapes: int = 7, state_s: float = 0.4, inverse: bool = False,
             last_color = None
     add(None, "black", "black", "middle")
 
-    return Challenge(id=secrets.token_hex(8), nonce=nonce, states=states)
+    total = sum(s.duration_s for s in states)
+    return Challenge(id=secrets.token_hex(8), nonce=nonce, states=states,
+                     haptic_times_s=_haptic_times(rng, total) if haptics else [],
+                     rppg_s=rppg_s)

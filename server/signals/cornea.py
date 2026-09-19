@@ -188,7 +188,8 @@ def _shift_crop(img: np.ndarray, cx: float, cy: float, half: int) -> np.ndarray:
     return cv2.warpAffine(img, M, (2 * half, 2 * half), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
 
 
-def analyze(bundle: Bundle, ch: Challenge, lag_ms: float) -> dict:
+def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = None) -> dict:
+    """`stash`, if given, receives the reference eye crop and iris fit for the continuity check."""
     W, H = bundle.full_size
     meta = bundle.meta
     events = bundle.events()
@@ -235,7 +236,7 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float) -> dict:
         crops = _state_means(bundle.video_path, assign, box=(x0, y0, x1 - x0, y1 - y0))
     else:
         crops = {si: m[y0:y1, x0:x1] for si, m in means.items()}
-    del means
+    frames_lw = means
     seed = (cx - x0, cy - y0)
     fs = 1.0 / k                                      # px scale relative to LOCALIZE_W
 
@@ -288,6 +289,8 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float) -> dict:
 
     # ---- 3. register every state to the reference iris
     icx, icy, ir = iris
+    if stash is not None:
+        stash.update(iris=iris, origin=(x0, y0), ref_state=ref_idx, frames=frames_lw, frame_scale=k, offsets={})
     T = int(min(1.5 * ir, min(ref_gray.shape) / 2 - 12 * fs))
     tx, ty = int(round(icx)), int(round(icy))
     tx = int(np.clip(tx, T, ref_gray.shape[1] - T))
@@ -301,6 +304,8 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float) -> dict:
         res = cv2.matchTemplate(gray, tmpl, cv2.TM_CCOEFF_NORMED)
         _, _, _, loc = cv2.minMaxLoc(res)
         ox, oy = loc[0] - (tx - T), loc[1] - (ty - T)          # how far the eye moved vs reference
+        if stash is not None:
+            stash["offsets"][s.index] = (ox, oy)
         u = (p["g"][0] - ox - icx) / ir                          # reflection position in iris radii
         v = (p["g"][1] - oy - icy) / ir
         us.append(u); vs.append(v)
