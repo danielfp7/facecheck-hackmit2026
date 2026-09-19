@@ -14,13 +14,13 @@ A Duo-style second factor that proves a **live human** is holding the phone, not
 
 ## Steps, in order
 
-Where things stand: the server, web page, Mac stand-in and attack rig are built and pass their tests on simulated captures. The iPhone app is written but has never been compiled, and nothing has been tuned on real footage. Details for each step are in the sections below.
+Where things stand: the app builds with Xcode 27 and runs on an iPhone 14 Pro, and genuine users verify end to end on real captures. Heartbeat and vibration are built but untuned, and no deepfake attack has been run against the phone yet, so section D is the work that remains. Sections A to C are for setting up another Mac or phone. Details for each step are in the sections below.
 
-**A. Get the phone app running** (blocked on Xcode; start the download first)
+**A. Get the phone app running** (Xcode is a multi-GB download; start it first)
 
 1. Install Xcode 27 (this Mac is on macOS 27) from developer.apple.com as a `.xip`, plus the iOS platform it offers. Then `sudo xcode-select -s /Applications/Xcode.app` and open Xcode once.
 2. Generate and open the project: `ios/bin/xcodegen/bin/xcodegen generate --spec ios/project.yml`, then open `ios/InHuman.xcodeproj`.
-3. Pick your signing team, plug in the iPhone, enable Developer Mode (needs a reboot), build. Fix compile errors as they come up; the Swift has only been syntax-checked.
+3. Pick your signing team, plug in the iPhone, enable Developer Mode (needs a reboot), build.
 4. Trust the developer profile on the phone: Settings → General → VPN & Device Management.
 5. Phone settings: turn off Auto-Brightness, True Tone, Night Shift and Low Power Mode.
 
