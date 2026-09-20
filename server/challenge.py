@@ -64,10 +64,6 @@ class Challenge:
     # the timing can't be predicted or pre-rendered.
     haptic_times_s: list[float] = field(default_factory=list)
     haptic_duration_s: float = 0.4
-    # Heartbeat: steady soft white after the flashes. Below full white so screen-lit
-    # skin doesn't clip under the exposure that was locked on the settle color.
-    rppg_s: float = 8.0
-    rppg_level: float = 0.8
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -83,8 +79,7 @@ class Challenge:
         return cls(id=d["id"], nonce=d["nonce"], states=states,
                    settle_color=d.get("settle_color", "green"), settle_s=d.get("settle_s", 0.6),
                    haptic_times_s=d.get("haptic_times_s", []),
-                   haptic_duration_s=d.get("haptic_duration_s", 0.4),
-                   rppg_s=d.get("rppg_s", 0.0), rppg_level=d.get("rppg_level", 0.8))
+                   haptic_duration_s=d.get("haptic_duration_s", 0.4))
 
 
 def _haptic_times(rng: random.Random, total_s: float, n: int = 3, min_gap: float = 1.2) -> list[float]:
@@ -98,7 +93,7 @@ def _haptic_times(rng: random.Random, total_s: float, n: int = 3, min_gap: float
 
 
 def generate(n_shapes: int = 7, state_s: float = 0.4, inverse: bool = False,
-             seed: str | None = None, haptics: bool = True, rppg_s: float = 8.0) -> Challenge:
+             seed: str | None = None, haptics: bool = True) -> Challenge:
     """Random sequence: black, shape, shape, black, shape, ... about 4-5 s total.
 
     Consecutive shape states always differ in color so every transition produces
@@ -139,5 +134,4 @@ def generate(n_shapes: int = 7, state_s: float = 0.4, inverse: bool = False,
 
     total = sum(s.duration_s for s in states)
     return Challenge(id=secrets.token_hex(8), nonce=nonce, states=states,
-                     haptic_times_s=_haptic_times(rng, total) if haptics else [],
-                     rppg_s=rppg_s)
+                     haptic_times_s=_haptic_times(rng, total) if haptics else [])

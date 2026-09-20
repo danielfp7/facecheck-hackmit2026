@@ -195,7 +195,6 @@ final class Flow: ObservableObject {
             "session": session,
         ]
         var fullMeta = meta
-        if let rppg = b.rppg { fullMeta["rppg"] = rppg }
         let transit = await capture.takeTransit()
         fullMeta["transit_ts"] = transit.ts
         fullMeta["transit_diag"] = transit.diag

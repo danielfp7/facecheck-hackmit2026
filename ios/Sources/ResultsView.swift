@@ -16,8 +16,6 @@ struct ResultsView: View {
                                 if let plot = r.signals?.lag?.plot { LightResponseChart(plot: plot) }
                             case "Eye reflection":
                                 if let states = r.signals?.cornea?.states { EyeReflectionGrid(states: states) }
-                            case "Heartbeat":
-                                if let plot = r.signals?.rppg?.plot { PulseChart(plot: plot) }
                             case "Vibration":
                                 if let plot = r.signals?.vibration?.plot { VibrationChart(plot: plot) }
                             case "Face match":
@@ -134,21 +132,6 @@ struct LightResponseChart: View {
         .chartYAxis(.hidden)
         .chartLegend(.hidden)
         .frame(height: 130)
-    }
-}
-
-/// Filtered pulse waveform from the steady-white window.
-struct PulseChart: View {
-    let plot: RppgPlot
-
-    var body: some View {
-        Chart(Array(plot.t.indices), id: \.self) { i in
-            LineMark(x: .value("s", plot.t[i]), y: .value("pulse", plot.wave[i]))
-                .foregroundStyle(Color.pink)
-                .interpolationMethod(.catmullRom)
-        }
-        .chartYAxis(.hidden)
-        .frame(height: 100)
     }
 }
 

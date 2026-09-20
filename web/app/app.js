@@ -31,7 +31,6 @@ const S = {
 const video = $("video");
 const full = document.createElement("canvas");
 const small = document.createElement("canvas");
-const tiny = document.createElement("canvas");
 
 // ---------- plumbing ----------
 
@@ -112,8 +111,6 @@ async function openCamera() {
   full.height = video.videoHeight;
   small.width = 480;
   small.height = Math.round((480 * video.videoHeight) / video.videoWidth);
-  tiny.width = 48;
-  tiny.height = 36;
 }
 
 function closeCamera() {
@@ -299,7 +296,6 @@ function paint(state) {
 async function runChallenge() {
   const ch = S.challenge, stage = $("stage");
   S.step = "challenge";
-  $("hold").hidden = true;
   paint("settle");
   stage.hidden = false;
 
@@ -338,58 +334,15 @@ async function runChallenge() {
   if (S.step !== "challenge") return;
   S.frames.on = false;
 
-  // Heartbeat window: steady soft white, skin colour sampled over a grid on every frame.
-  let rppg = null;
-  if (ch.rppg_s > 0) {
-    const v = Math.round(255 * (ch.rppg_level ?? 0.8));
-    stage.style.background = `rgb(${v},${v},${v})`;
-    $("shape").innerHTML = "";
-    $("hold").hidden = false;
-    rppg = await samplePulse(ch.rppg_s);
-    if (S.step !== "challenge") return;
-  }
-
   await Promise.all(S.frames.pending);
   await unlockExposure();
   show("uploading");                        // before leaving fullscreen, or the exit reads as "stopped"
   stage.hidden = true;
   if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
-  await upload(events, rppg);
+  await upload(events);
 }
 
-function samplePulse(seconds) {
-  const ROWS = 6, COLS = 4, ctx = tiny.getContext("2d", { willReadFrequently: true });
-  const t = [], rgb = [];
-  const t0 = now();
-  return new Promise((done) => {
-    const sample = (ts) => {
-      ctx.drawImage(video, 0, 0, tiny.width, tiny.height);
-      const px = ctx.getImageData(0, 0, tiny.width, tiny.height).data;
-      const cw = tiny.width / COLS, chh = tiny.height / ROWS, cells = [];
-      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-        let R = 0, G = 0, B = 0, n = 0;
-        for (let y = r * chh; y < (r + 1) * chh; y++) for (let x = c * cw; x < (c + 1) * cw; x++) {
-          const i = (y * tiny.width + x) * 4; R += px[i]; G += px[i + 1]; B += px[i + 2]; n++;
-        }
-        cells.push([R / n / 255, G / n / 255, B / n / 255]);
-      }
-      t.push(ts); rgb.push(cells);
-    };
-    const step = (ms, md) => {
-      if (S.step !== "challenge") return done(null);
-      const left = seconds - (now() - t0);
-      if (left <= 0) return done({ t, rgb, grid: [ROWS, COLS] });
-      $("holdCount").textContent = Math.ceil(left);
-      sample(((md && (md.captureTime ?? md.presentationTime)) ?? ms) / 1000);
-      next();
-    };
-    const next = () => ("requestVideoFrameCallback" in HTMLVideoElement.prototype
-      ? video.requestVideoFrameCallback(step) : requestAnimationFrame((ms) => step(ms, null)));
-    next();
-  });
-}
-
-async function upload(events, rppg) {
+async function upload(events) {
   show("uploading");
   const ch = S.challenge, F = S.frames, T = S.transit;
   const settings = S.track.getSettings();
@@ -406,7 +359,6 @@ async function upload(events, rppg) {
     session: { selfie_ts: S.selfieTs, challenge_start_ts: events[0]?.ts ?? 0, interruptions: 0 },
     transit_ts: T.ts.filter((_, i) => T.blobs[i]),
   };
-  if (rppg) meta.rppg = rppg;
 
   const fd = new FormData();
   fd.append("challenge_id", ch.id);
@@ -507,10 +459,6 @@ function renderResults(r) {
         d.querySelector(".cap").innerHTML = `<span>${s.sent_color} ${s.sent_shape}, ${pos}</span><span class="${ok ? "ok" : "bad"}">${ok ? "✓" : "✕"}</span>`;
         grid.appendChild(d);
       }
-    }
-    if (t.name === "Heartbeat" && sig.rppg?.plot) {
-      const c = el.appendChild(document.createElement("canvas")), p = sig.rppg.plot;
-      requestAnimationFrame(() => lineChart(c, [{ x: p.t, y: p.wave, color: "#e93d82" }]));
     }
     if (t.name === "Face match" && r.capture) {
       const img = el.appendChild(document.createElement("img"));

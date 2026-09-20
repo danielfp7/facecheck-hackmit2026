@@ -1,8 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Full-screen challenge: flash sequence (with haptic bursts), then a steady soft-white
-/// heartbeat window.
+/// Full-screen challenge: flash sequence with haptic bursts.
 ///
 /// Geometry contract shared with server/render.py:
 ///  - shape centered horizontally, spanning `shapeSpan` of the screen width
@@ -18,7 +17,6 @@ final class ChallengeViewController: UIViewController {
     private let onDone: (Result<CaptureBundle, Error>) -> Void
 
     private let shapeLayer = CAShapeLayer()
-    private let pulseLabel = UILabel()
     private var link: CADisplayLink?
     private var previousBrightness: CGFloat = 0.5
     private var finished = false
@@ -54,21 +52,6 @@ final class ChallengeViewController: UIViewController {
         shapeLayer.isHidden = true
         view.layer.addSublayer(shapeLayer)
         view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(abort)))
-
-        // Large and centered: the phone is a few inches from the eye, where small text can't
-        // be read. Dark text on the soft white costs almost no light.
-        pulseLabel.textColor = UIColor(white: 0.12, alpha: 1)
-        pulseLabel.textAlignment = .center
-        pulseLabel.numberOfLines = 0
-        pulseLabel.isHidden = true
-        pulseLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(pulseLabel)
-        NSLayoutConstraint.activate([
-            pulseLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            pulseLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            pulseLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
-            pulseLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
-        ])
 
         var t = 0.0
         boundaries = challenge.states.map { t += $0.durationS; return t }
@@ -181,7 +164,7 @@ final class ChallengeViewController: UIViewController {
         return UIColor(red: CGFloat(rgb[0]) / 255, green: CGFloat(rgb[1]) / 255, blue: CGFloat(rgb[2]) / 255, alpha: 1)
     }
 
-    /// Flashes are over: close the video, then hold a steady soft white for the heartbeat.
+    /// Flashes are over: close the video and hand the capture back.
     private func endFlashPhase() {
         guard !finished, link != nil else { return }
         link?.invalidate()
@@ -190,39 +173,16 @@ final class ChallengeViewController: UIViewController {
         let hapticLog = haptics.log
         haptics.stop()
         let events = self.events
-        let pulseSeconds = challenge.rppgS ?? 0
 
         Task { @MainActor in
             do {
-                // The writer finishes in the background while the heartbeat window runs.
-                async let recording = capture.stopRecording()
-                var rppg: [String: Any]? = nil
-                if pulseSeconds > 0 {
-                    let level = CGFloat(challenge.rppgLevel ?? 0.8)
-                    CATransaction.begin()
-                    CATransaction.setDisableActions(true)
-                    shapeLayer.isHidden = true
-                    view.layer.backgroundColor = UIColor(white: level, alpha: 1).cgColor
-                    CATransaction.commit()
-                    pulseLabel.isHidden = false
-                    // Felt as well as seen. It lands inside the first 0.7 s, which the server skips.
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    capture.startSampling()
-                    let whole = Int(pulseSeconds.rounded(.up))
-                    for remaining in stride(from: whole, to: 0, by: -1) {
-                        guard !finished else { return }
-                        pulseLabel.attributedText = holdMessage(remaining)
-                        try? await Task.sleep(nanoseconds: UInt64(pulseSeconds / Double(whole) * 1e9))
-                    }
-                    rppg = await capture.stopSampling()
-                }
-                let rec = try await recording
+                let rec = try await capture.stopRecording()
                 guard !finished else { return }
                 finished = true
                 cleanup()
                 onDone(.success(CaptureBundle(videoURL: rec.url, frameTimestamps: rec.frames,
                                               droppedTimestamps: rec.dropped, displayEvents: events,
-                                              camera: capture.cameraMeta, imu: imu, haptics: hapticLog, rppg: rppg)))
+                                              camera: capture.cameraMeta, imu: imu, haptics: hapticLog)))
             } catch {
                 guard !finished else { return }
                 finished = true
@@ -230,22 +190,6 @@ final class ChallengeViewController: UIViewController {
                 onDone(.failure(error))
             }
         }
-    }
-
-    private func holdMessage(_ remaining: Int) -> NSAttributedString {
-        let para = NSMutableParagraphStyle()
-        para.alignment = .center
-        para.lineSpacing = 6
-        let text = NSMutableAttributedString(
-            string: "Keep holding the phone\nin place\n",
-            attributes: [.font: UIFont.systemFont(ofSize: 34, weight: .bold), .paragraphStyle: para])
-        text.append(NSAttributedString(
-            string: "Reading your pulse\n",
-            attributes: [.font: UIFont.systemFont(ofSize: 22, weight: .medium), .paragraphStyle: para]))
-        text.append(NSAttributedString(
-            string: "\(remaining)",
-            attributes: [.font: UIFont.monospacedDigitSystemFont(ofSize: 72, weight: .heavy), .paragraphStyle: para]))
-        return text
     }
 
     /// Tap anywhere to stop the flashing immediately.

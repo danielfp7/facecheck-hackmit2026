@@ -48,7 +48,7 @@
     <div class="card center">
       <div class="warn" aria-hidden="true">⚠</div>
       <h1>Flashing colors ahead</h1>
-      <p class="muted">This check fills the screen with bright colored shapes for about 5 seconds, then holds a white screen for 8 seconds. Don't continue if you have photosensitive epilepsy. Press Esc at any time to stop.</p>
+      <p class="muted">This check fills the screen with bright colored shapes for about 5 seconds. Don't continue if you have photosensitive epilepsy. Press Esc at any time to stop.</p>
       <button id="btnContinue" class="primary">Continue</button>
       <button id="btnCancelWarn" class="secondary">Cancel</button>
     </div>
@@ -73,11 +73,6 @@
   <!-- Full-screen flash stage -->
   <div id="stage" hidden>
     <svg id="shape" xmlns="http://www.w3.org/2000/svg"></svg>
-    <div id="hold" hidden>
-      <div class="holdTitle">Keep your face right there</div>
-      <div class="holdSub">Reading your pulse</div>
-      <div id="holdCount" class="holdCount">8</div>
-    </div>
   </div>
 
   <section id="uploading" class="screen" hidden>

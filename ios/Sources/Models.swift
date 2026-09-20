@@ -20,8 +20,6 @@ struct Challenge: Codable {
     let shapeSpan: Double
     let hapticTimesS: [Double]?     // offsets from the first state; chosen by the server
     let hapticDurationS: Double?
-    let rppgS: Double?              // steady-white heartbeat window after the flashes
-    let rppgLevel: Double?
 }
 
 struct AuthRequest: Codable, Identifiable {
@@ -90,18 +88,6 @@ struct IdentitySignal: Codable {
     let reason: String?
 }
 
-struct RppgPlot: Codable {
-    let t: [Double]
-    let wave: [Double]
-}
-
-struct RppgSignal: Codable {
-    let ok: Bool
-    let bpm: Double?
-    let snrDb: Double?
-    let plot: RppgPlot?
-}
-
 struct VibrationPlot: Codable {
     let tImu: [Double]
     let imu: [Double]
@@ -120,7 +106,6 @@ struct Signals: Codable {
     let lag: LagSignal?
     let cornea: CorneaSignal?
     let identity: IdentitySignal?
-    let rppg: RppgSignal?
     let vibration: VibrationSignal?
 }
 
@@ -141,5 +126,4 @@ struct CaptureBundle {
     let camera: [String: Any]
     let imu: [String: Any]
     let haptics: [[String: Any]]
-    let rppg: [String: Any]?
 }

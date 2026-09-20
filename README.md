@@ -8,13 +8,12 @@ A Duo-style second factor that proves a **live human** is holding the phone, not
 4. **Check 1, light response and lag.** Skin follows the screen's colors instantly; the only genuine delay is display + camera. A pipeline that must see the flash, re-render a face and inject it arrives 150–300 ms late. No response at all, or a response later than this phone's calibrated baseline + 100 ms, fails.
 5. **Check 2, corneal reflection.** The eye is a tiny convex mirror, so it shows a minified copy of the screen. The server finds the reflection, fits the iris around it (irises are ~11.7 mm in everyone, so this also measures the true distance), and checks that the reflection's position and color match what was sent, that it sits inside the iris, and that it is cornea-sized (a laptop screen or print reflects at the wrong size). The shape outline is scored too once the reflection spans ~18 px, which needs the phone at about 4 inches.
 6. **Continuity.** The selfie and the eye check must be one sitting and one person. Otherwise an attacker could show a deepfake for the selfie and their own real eye for the liveness checks. The app cancels the check if you leave it, if the camera is interrupted, or if more than 20 s pass after the selfie. The server runs face recognition on the eye-check frames themselves, aligned by hand from the iris position and size, and compares them to the selfie (measured: same person 0.36-0.67, different people <= 0.12). The phone also keeps ~10 small frames per second from the selfie until the flashes start, and the server watches the whole move: every detectable face must still be the selfie person, consecutive frames must be one continuous view (matched on fine detail; measured >= 0.70 for continuous footage and 0.11-0.18 across a cut between two people), and no frames may be missing.
-7. **Heartbeat** (shown, never decisive): 8 s of steady soft white after the flashes; the phone sends per-frame skin color over a grid and the server runs the POS rPPG algorithm. It catches prints and masks only: a replay or a good face swap carries the filmed person's real pulse.
-8. **Vibration** (informational until tuned): three haptic bursts at server-chosen random times, with gyro and accelerometer logged on the camera's clock. The server checks the sensor felt each burst, whether the video jittered at those instants, and whether image motion follows the gyro overall. Injected video does neither.
-9. Verdict: **verified**, **unverified** (with the failing signal named) or **unverifiable**.
+7. **Vibration** (informational until tuned): three haptic bursts at server-chosen random times, with gyro and accelerometer logged on the camera's clock. The server checks the sensor felt each burst, whether the video jittered at those instants, and whether image motion follows the gyro overall. Injected video does neither.
+8. Verdict: **verified**, **unverified** (with the failing signal named) or **unverifiable**.
 
 ## Steps, in order
 
-Where things stand: the app builds with Xcode 27 and runs on an iPhone 14 Pro, and genuine users verify end to end on real captures. Heartbeat and vibration are built but untuned, and no deepfake attack has been run against the phone yet, so section D is the work that remains. Sections A to C are for setting up another Mac or phone. Details for each step are in the sections below.
+Where things stand: the app builds with Xcode 27 and runs on an iPhone 14 Pro, and genuine users verify end to end on real captures. Vibration is built but untuned, and no deepfake attack has been run against the phone yet, so section D is the work that remains. Sections A to C are for setting up another Mac or phone. Details for each step are in the sections below.
 
 **A. Get the phone app running** (Xcode is a multi-GB download; start it first)
 
@@ -49,13 +48,13 @@ Where things stand: the app builds with Xcode 27 and runs on an iPhone 14 Pro, a
 17. Run the full loop 20 times in the demo room's lighting on the demo phone. Fix flakiness only.
 18. Record a backup video of a genuine pass and an attack fail.
 
-**F. Still to do:** tune heartbeat and vibration on real captures; run the Deep-Live-Cam attacks.
+**F. Still to do:** tune vibration on real captures; run the Deep-Live-Cam attacks.
 
 ## Layout
 
 | Path | What |
 | --- | --- |
-| `server/` | FastAPI + signal processing (`signals/`: `lag`, `cornea`, `continuity`, `identity`, `rppg`, `vibration`; `verdict.py`) |
+| `server/` | FastAPI + signal processing (`signals/`: `lag`, `cornea`, `continuity`, `identity`, `transit`, `vibration`; `verdict.py`) |
 | `web/` | Demo relying-party page ("Demo Bank" sign-in) served at `/`; `web/app/` is the webcam client served at `/app/` |
 | `ios/` | Swift app. `project.yml` → Xcode project via XcodeGen |
 | `tools/mac_capture.py` | Mac webcam stand-in for the phone; also the injection/lag attack simulator |
@@ -84,7 +83,7 @@ uv run --project server tools/mac_capture.py --synthetic --flat          # flat-
 
 The same product in a browser, served by the same server: open <http://localhost:8000/app/> in Chrome. Enroll, then either **Run a test check**, or go to the demo page at <http://localhost:8000> and press **Sign in, verify on this computer**, which opens the web app straight onto that request. **Sign in, verify on my phone** sends it to the iPhone instead; a request aimed at one device is invisible to the other. Accounts are shared: enroll on either, verify on either.
 
-Flow: selfie at your normal distance → lean in until the colored part of one eye fills the on-screen ring (about 8 inches / 20 cm) while the move is watched → full-screen flashes → 8 s pulse window → results tiles. The phone uses the same ring, sized for 4 inches: "put your eye in the outline" left people at 5-6 inches.
+Flow: selfie at your normal distance → lean in until the colored part of one eye fills the on-screen ring (about 8 inches / 20 cm) while the move is watched → full-screen flashes → results tiles. The phone uses the same ring, sized for 4 inches: "put your eye in the outline" left people at 5-6 inches.
 
 What a browser changes, and how it is handled:
 
@@ -173,4 +172,4 @@ The sequence holds every state for at least 0.34 s (under 2 flashes per second, 
 
 ## What is and isn't validated
 
-On real iPhone 14 Pro captures: Check 1, Check 2 (position + color; works through glasses), face match and continuity, including rejecting every selfie/eye-check pairing of two different people. Heartbeat and vibration pass their unit tests on simulated signals but have not been tuned on real captures, so heartbeat never decides the verdict and vibration is informational. No deepfake attack has been run against the phone yet.
+On real iPhone 14 Pro captures: Check 1, Check 2 (position + color; works through glasses), face match and continuity, including rejecting every selfie/eye-check pairing of two different people. Vibration passes its unit test on simulated signals but has not been tuned on real captures, so it is informational. No deepfake attack has been run against the phone yet.

@@ -21,7 +21,7 @@ import challenge as challenge_mod
 import verdict as verdict_mod
 import cv2
 
-from signals import continuity, cornea, identity, lag, rppg, transit, vibration
+from signals import continuity, cornea, identity, lag, transit, vibration
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
@@ -174,13 +174,12 @@ def run_pipeline(video: Path, meta: dict, ch: challenge_mod.Challenge,
         transit_r = transit.analyze(transit.unpack(transit_blob), meta.get("transit_ts", []), selfie_emb,
                                     first if ok else None, float(b.ts[0]))
     stash.clear()                                   # frames are large
-    rppg_r = rppg.analyze(meta.get("rppg")) if "rppg" in meta else None
     vib_r = vibration.analyze(b) if meta.get("haptics") else None
 
     out = verdict_mod.decide(lag_r, cornea_r, ident, meta, SHAPE_MODE,
-                             continuity=cont_r, rppg=rppg_r, vibration=vib_r, transit=transit_r)
+                             continuity=cont_r, vibration=vib_r, transit=transit_r)
     out["signals"] = {"lag": lag_r, "cornea": cornea_r, "identity": ident, "continuity": cont_r,
-                      "transit": transit_r, "rppg": rppg_r, "vibration": vib_r}
+                      "transit": transit_r, "vibration": vib_r}
     return out
 
 

@@ -38,11 +38,6 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
     private var droppedTS: [Double] = []
     private var selfieWaiters: [(Data?) -> Void] = []
     private var frameSize = CGSize.zero
-    // Heartbeat window: per-frame mean color over a grid, instead of more video.
-    private var sampling = false
-    private var sampleTS: [Double] = []
-    private var sampleRGB: [[[Double]]] = []
-    static let gridRows = 6, gridCols = 4
     // Transit: small frames from the selfie until the flashes start, so the server can
     // watch the move to the eye as one continuous shot.
     private var transitOn = false
@@ -360,56 +355,6 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
         }
     }
 
-    // MARK: Heartbeat sampling
-
-    func startSampling() {
-        queue.async {
-            self.sampleTS = []
-            self.sampleRGB = []
-            self.sampling = true
-        }
-    }
-
-    func stopSampling() async -> [String: Any] {
-        await withCheckedContinuation { cont in
-            queue.async {
-                self.sampling = false
-                cont.resume(returning: ["t": self.sampleTS, "rgb": self.sampleRGB,
-                                        "grid": [CaptureController.gridRows, CaptureController.gridCols]])
-            }
-        }
-    }
-
-    /// Mean RGB (0...1) per grid cell of a 420f bi-planar buffer, sampling every 8th pixel.
-    private func gridMeans(_ pb: CVPixelBuffer) -> [[Double]] {
-        let rows = CaptureController.gridRows, cols = CaptureController.gridCols
-        CVPixelBufferLockBaseAddress(pb, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(pb, .readOnly) }
-        guard CVPixelBufferGetPlaneCount(pb) >= 2,
-              let yBase = CVPixelBufferGetBaseAddressOfPlane(pb, 0),
-              let cBase = CVPixelBufferGetBaseAddressOfPlane(pb, 1) else { return [] }
-        let w = CVPixelBufferGetWidthOfPlane(pb, 0), h = CVPixelBufferGetHeightOfPlane(pb, 0)
-        let yStride = CVPixelBufferGetBytesPerRowOfPlane(pb, 0), cStride = CVPixelBufferGetBytesPerRowOfPlane(pb, 1)
-        let yp = yBase.assumingMemoryBound(to: UInt8.self), cp = cBase.assumingMemoryBound(to: UInt8.self)
-        let n = rows * cols
-        var sy = [Double](repeating: 0, count: n), sb = sy, sr = sy, cnt = sy
-        let step = 8
-        for y in stride(from: 0, to: h, by: step) {
-            let r = min(y * rows / h, rows - 1)
-            let yRow = yp + y * yStride, cRow = cp + (y / 2) * cStride
-            for x in stride(from: 0, to: w, by: step) {
-                let i = r * cols + min(x * cols / w, cols - 1)
-                let cx = (x / 2) * 2
-                sy[i] += Double(yRow[x]); sb[i] += Double(cRow[cx]); sr[i] += Double(cRow[cx + 1]); cnt[i] += 1
-            }
-        }
-        // Full-range BT.709 YCbCr -> RGB. Means commute with the linear transform.
-        return (0..<n).map { i in
-            let c = max(cnt[i], 1), Y = sy[i] / c, cb = sb[i] / c - 128, cr = sr[i] / c - 128
-            return [(Y + 1.5748 * cr) / 255, (Y - 0.1873 * cb - 0.4681 * cr) / 255, (Y + 1.8556 * cb) / 255]
-        }
-    }
-
     private func makeWriter(width: Int, height: Int) throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("capture-\(UUID().uuidString).mov")
         let w = try AVAssetWriter(outputURL: url, fileType: .mov)
@@ -462,14 +407,6 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
                 let began = CACurrentMediaTime()
                 appendTransit(pixels, at: ts)
                 transitSlowestMS = max(transitSlowestMS, (CACurrentMediaTime() - began) * 1000)
-            }
-        }
-
-        if sampling {
-            let cells = gridMeans(pixels)
-            if !cells.isEmpty {
-                sampleTS.append(hostSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer)))
-                sampleRGB.append(cells)
             }
         }
 

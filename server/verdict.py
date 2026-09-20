@@ -31,7 +31,6 @@ THRESHOLDS = {
     "continuity_min": 0.25,
     "max_selfie_to_check_s": 25.0,
     "transit_max_blur_s": 1.0,
-    "rppg_snr_db_min": 2.0,
 }
 
 
@@ -49,7 +48,7 @@ def _tile(name: str, status: str, headline: str, detail: str = "") -> dict:
 
 
 def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str = "auto",
-           continuity: dict | None = None, rppg: dict | None = None, vibration: dict | None = None,
+           continuity: dict | None = None, vibration: dict | None = None,
            transit: dict | None = None) -> dict:
     """shape_mode: 'auto' scores the outline only when the reflection is large enough to
     read it; 'shape' always does; 'layout' never does (position + color only)."""
@@ -172,18 +171,6 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
             for t in tiles:
                 if t["name"] == "Continuity":
                     t.update(status="red", headline="Broken", detail=failures[-1])
-
-    # Heartbeat: shown, never decisive. It catches prints and masks only; a replay or a
-    # good face swap carries the filmed person's real pulse.
-    if rppg is not None:
-        if not rppg.get("ok"):
-            tiles.append(_tile("Heartbeat", "yellow", "Not measured", rppg.get("reason", "")))
-        elif rppg.get("snr_db") is not None and rppg["snr_db"] >= T["rppg_snr_db_min"] and rppg.get("bpm"):
-            tiles.append(_tile("Heartbeat", "green", f"{rppg['bpm']:.0f} bpm", f"signal {rppg['snr_db']:.1f} dB; weak evidence on its own"))
-        else:
-            snr = rppg.get("snr_db")
-            tiles.append(_tile("Heartbeat", "yellow", "No clear pulse",
-                               (f"signal {snr:.1f} dB; " if snr is not None else "") + "hold still, or this is a print"))
 
     # Vibration: informational until thresholds are set from real-vs-attack captures.
     if vibration is not None:

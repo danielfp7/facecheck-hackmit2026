@@ -94,37 +94,7 @@ def test_verdicts(cases, ch, name, expected, needle):
     assert needle in v["reason"]
 
 
-# ---------- heartbeat + vibration (pure signal tests, no video) ----------
-
-def _rppg_meta(bpm=72.0, pulse_amp=0.004, seconds=8.0, fps=60, seed=1):
-    import numpy as np
-    rng = np.random.default_rng(seed)
-    t = 500.0 + np.arange(int(seconds * fps)) / fps
-    skin = np.array([0.62, 0.45, 0.38])
-    beat = np.sin(2 * np.pi * bpm / 60 * t)
-    # Blood volume changes absorb green most, then blue, then red.
-    cells = []
-    for c in range(24):
-        base = skin * (0.85 + 0.3 * rng.random())
-        cells.append(base * (1 + pulse_amp * beat[:, None] * np.array([0.35, 1.0, 0.6])) + rng.normal(0, 0.0012, (len(t), 3)))
-    rgb = np.stack(cells, axis=1)
-    rgb[:, 0] = [0.02, 0.02, 0.03]          # a dark background cell
-    rgb[:, 1] = [0.99, 0.99, 0.99]          # a clipped cell
-    return {"t": t.tolist(), "grid": [6, 4], "rgb": rgb.tolist()}
-
-
-def test_rppg_recovers_heart_rate():
-    from signals import rppg
-    r = rppg.analyze(_rppg_meta(bpm=72))
-    assert r["ok"] and abs(r["bpm"] - 72) < 4 and r["snr_db"] > 3
-
-
-def test_rppg_print_has_no_pulse():
-    from signals import rppg
-    live = rppg.analyze(_rppg_meta(bpm=72))
-    flat = rppg.analyze(_rppg_meta(pulse_amp=0.0))
-    assert flat["ok"] and flat["snr_db"] < live["snr_db"] - 6
-
+# ---------- vibration (pure signal test, no video) ----------
 
 def _vibration_case(video_follows: bool, seed=2):
     import numpy as np
