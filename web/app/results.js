@@ -11,7 +11,14 @@
   "use strict";
 
   const PASS_MARK = 0.35;                                   // server THRESHOLDS: face similarity pass mark
-  const FLASH = { red: "rgb(255,80,40)", green: "rgb(0,255,0)" };   // server challenge.COLORS: what the screen showed
+  // What the screen showed, from server/challenge.py COLORS. Anything the server adds and
+  // this map misses would silently draw as grey, so fall back to grey rather than to a
+  // colour that is wrong: a blue flash drawn as green is worse than one drawn as unknown.
+  const FLASH = {
+    red: "rgb(255,80,40)", green: "rgb(0,255,0)", blue: "rgb(35,110,245)",
+    white: "rgb(255,255,255)", black: "rgb(20,20,20)",
+  };
+  const flashFill = (name) => FLASH[name] || "rgb(140,146,158)";
   const SHAPE_SPAN = 0.75;                                  // web client: shape spans 75% of the screen height
   const TITLE = { verified: "Verified", unverified: "Not verified", unverifiable: "Couldn't verify" };
   const TONE = { verified: "ok", unverified: "bad", unverifiable: "warn" };
@@ -302,7 +309,7 @@
 
   /** A tiny rendering of what the screen displayed for one flash. */
   function miniScreen(s, axisX) {
-    const fill = FLASH[s.sent_color] || FLASH.green;
+    const fill = flashFill(s.sent_color);
     const shape = SHAPES.has(s.sent_shape) ? s.sent_shape : "circle";
     const p = POS[s.sent_position] != null ? POS[s.sent_position] : 0.5;
     const W = axisX ? 160 : 100, H = axisX ? 100 : 160;
@@ -317,7 +324,7 @@
 
   /** 12px glyph of the sent shape in its colour, for the thumbnail strip. */
   function glyph(s) {
-    const fill = FLASH[s.sent_color] || FLASH.green;
+    const fill = flashFill(s.sent_color);
     const shape = SHAPES.has(s.sent_shape) ? s.sent_shape : "circle";
     const body = shape === "circle" ? `<circle cx="6" cy="6" r="5" fill="${fill}"/>`
       : shape === "square" ? `<rect x="1" y="1" width="10" height="10" fill="${fill}"/>`
@@ -326,8 +333,7 @@
   }
 
   function describe(s, axisX) {
-    const pos = axisX ? POS_NAME_X[s.sent_position] || s.sent_position : s.sent_position;
-    return [s.sent_color, s.sent_shape, pos].filter(Boolean).join(" ").replace(/^(\w+) (\w+) (\w+)$/, "$1 $2, $3");
+    return [s.sent_color, s.sent_shape].filter(Boolean).join(" ");
   }
 
   function buildReplay(states, axisX, failed) {

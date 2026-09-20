@@ -241,11 +241,10 @@ function startFrames() {
 
 const IRIS_MM = 11.7;
 const HOLD_S = 0.6;                 // how long a good pose must hold before it fires
-const LOST_GRACE_S = 0.9;           // keep the last ring this long after losing the face
+const LOST_GRACE_S = 0.9;           // keep the last reading this long after losing the face
 const SELFIE_MIN_FACE = 0.32;       // face height as a fraction of frame: "fills the outline"
-const STEADY_PX = 22;               // allowed movement while holding, in video px
-const AUTO_MAX_DIST_MM = 230;       // start the flashes at or inside this
-const NUDGE_DIST_MM = 300;          // beyond this, ask them to come closer
+const IN_OUTLINE_FRAC = 0.30;       // eye must sit within this fraction of the ring's radius
+const SIZE_TOL = 0.28;              // and its iris within this fraction of the ring's size
 
 function trackerReady() { return !!(window.FaceCheckTracker && S.tracker.ready); }
 
@@ -254,10 +253,9 @@ function stopTracking() {
   T.on = false;
   if (T.raf) cancelAnimationFrame(T.raf);
   T.raf = null;
-  T.last = T.lostAt = T.goodSince = T.anchor = null;
+  T.last = T.lostAt = T.goodSince = null;
   T.phase = null;
-  const ring = $("ring");
-  ring.classList.remove("tracked", "near");
+  $("ring").classList.remove("locked");
   $("hud").hidden = true;
 }
 
@@ -269,6 +267,12 @@ function videoToCss(x, y) {
            y: (y - vh / 2) * scale + innerHeight / 2, scale };
 }
 
+/** Iris radius in video px at the distance the outline is drawn for. */
+function targetIrisPx() {
+  const pxPerMM = video.videoWidth / (2 * TARGET_DISTANCE_MM * Math.tan((ASSUMED_FOV_DEG * Math.PI) / 360));
+  return (IRIS_MM / 2) * pxPerMM;
+}
+
 function setHud(state, main, sub) {
   const h = $("hud");
   h.hidden = false;
@@ -277,11 +281,20 @@ function setHud(state, main, sub) {
   $("hudSub").textContent = sub || "";
 }
 
-/** One tracking pass. `phase` is "selfie" or "close". */
+/**
+ * The outline is a fixed target in the middle of the screen and does not move. The person
+ * brings their eye to it, which is what pins the working distance, and the working distance
+ * is what decides how many pixels across the screen's reflection lands in. Letting the ring
+ * chase the eye meant people stopped wherever the tracker was happy, so the reflection
+ * arrived at whatever size, and reading the outline out of it became unreliable.
+ *
+ * Tracking still runs, but only to answer one question: is the eye in the outline yet. It
+ * never moves the target and it can always be replaced by the button.
+ */
 function startTracking(phase) {
   const T = S.tracker;
   stopTracking();
-  if (!trackerReady()) return;                 // buttons remain the way through
+  if (!trackerReady()) { setHud("hunting", phase === "selfie" ? "Fill the outline" : "Put your eye in the outline", "Then press the button"); return; }
   T.on = true; T.phase = phase;
   const ring = $("ring"), guide = $("guide");
 
@@ -302,22 +315,16 @@ function startTracking(phase) {
       T.lostAt = t;
     }
     const have = T.last && (!T.lostAt || t - T.lostAt < LOST_GRACE_S);
-
     if (!have) {
-      T.goodSince = T.anchor = null;
-      ring.classList.remove("tracked", "near");
-      setHud("hunting", phase === "selfie" ? "Show your face" : "Bring one eye to the camera",
-             "Looking for you");
+      T.goodSince = null;
+      ring.classList.remove("locked");
+      setHud("hunting", phase === "selfie" ? "Fill the outline" : "Put your eye in the outline", "Looking for you");
       T.raf = requestAnimationFrame(tick);
       return;
     }
 
     const { eye, box, mm } = T.last;
-    const moved = T.anchor ? Math.hypot(eye.x - T.anchor.x, eye.y - T.anchor.y) : 0;
-    if (!T.anchor || moved > STEADY_PX) { T.anchor = { x: eye.x, y: eye.y }; T.goodSince = null; }
-
     if (phase === "selfie") {
-      ring.classList.remove("tracked", "near");
       const fill = box.h / video.videoHeight;
       guide.classList.toggle("locked", fill >= SELFIE_MIN_FACE);
       if (fill < SELFIE_MIN_FACE) {
@@ -325,28 +332,33 @@ function startTracking(phase) {
         setHud("hunting", "Closer", `${Math.round(mm)} mm away`);
       } else {
         if (T.goodSince == null) T.goodSince = t;
-        const held = t - T.goodSince;
-        setHud("good", held >= HOLD_S ? "Hold it" : "Hold still", `${Math.round(mm)} mm away`);
-        if (held >= HOLD_S) { stopTracking(); shutter(); return; }
+        setHud("good", t - T.goodSince >= HOLD_S ? "Hold it" : "Hold still", `${Math.round(mm)} mm away`);
+        if (t - T.goodSince >= HOLD_S) { stopTracking(); shutter(); return; }
       }
+      T.raf = requestAnimationFrame(tick);
+      return;
+    }
+
+    // Eye check: is the eye inside the fixed outline, at the size the outline is drawn for?
+    const want = targetIrisPx();
+    const centre = { x: video.videoWidth / 2, y: video.videoHeight / 2 };
+    const off = Math.hypot(eye.x - centre.x, eye.y - centre.y) / want;   // in iris radii
+    const sizeErr = Math.abs(eye.r - want) / want;
+    const centred = off <= IN_OUTLINE_FRAC * 2;
+    const rightSize = sizeErr <= SIZE_TOL;
+    ring.classList.toggle("locked", centred && rightSize);
+    if (!rightSize) {
+      T.goodSince = null;
+      setHud("warn", eye.r < want ? "Closer" : "Back off a little",
+             `${Math.round(mm)} mm \u2014 fill the outline`);
+    } else if (!centred) {
+      T.goodSince = null;
+      setHud("warn", "Centre your eye", `${Math.round(mm)} mm \u2014 move it into the outline`);
     } else {
-      // Ring drawn at true iris size, sitting on the eye.
-      const { x, y, scale } = videoToCss(eye.x, eye.y);
-      ring.style.left = `${x}px`;
-      ring.style.top = `${y}px`;
-      ring.style.width = ring.style.height = `${2 * eye.r * scale}px`;
-      ring.classList.add("tracked");
-      const close = mm <= AUTO_MAX_DIST_MM;
-      ring.classList.toggle("near", close);
-      if (!close) {
-        T.goodSince = null;
-        setHud(mm > NUDGE_DIST_MM ? "hunting" : "warn", "Closer", `${Math.round(mm)} mm — come to about 170`);
-      } else {
-        if (T.goodSince == null) T.goodSince = t;
-        const held = t - T.goodSince;
-        setHud("good", held >= HOLD_S ? "Starting" : "Hold still", `${Math.round(mm)} mm — locked on your eye`);
-        if (held >= HOLD_S) { stopTracking(); ready(); return; }
-      }
+      if (T.goodSince == null) T.goodSince = t;
+      const held = t - T.goodSince;
+      setHud("good", held >= HOLD_S ? "Starting" : "Hold still", `${Math.round(mm)} mm \u2014 in the outline`);
+      if (held >= HOLD_S) { stopTracking(); ready(); return; }
     }
     T.raf = requestAnimationFrame(tick);
   };
@@ -374,15 +386,15 @@ function cameraMode(mode) {
   const ring = $("ring");
   ring.hidden = selfie;
   if (!selfie) {
-    // Starting size: an iris (11.7 mm) at the target distance. Tracking takes over from here.
-    const pxPerMM = video.videoWidth / (2 * TARGET_DISTANCE_MM * Math.tan((ASSUMED_FOV_DEG * Math.PI) / 360));
+    // Fixed target in the middle: the coloured part of one eye, at the working distance.
+    // It does not move, because lining the eye up with it is what pins that distance.
     const cssPerPx = Math.max(innerWidth / video.videoWidth, innerHeight / video.videoHeight);
     ring.style.left = ring.style.top = "50%";
-    ring.style.width = ring.style.height = `${IRIS_MM * pxPerMM * cssPerPx}px`;
+    ring.style.width = ring.style.height = `${2 * targetIrisPx() * cssPerPx}px`;
   }
   $("camBanner").innerHTML = selfie
     ? `<b>${S.enrolling ? "Enroll: look at the camera" : "Look at the camera"}</b>${trackerReady() ? "The photo takes itself once your face fills the outline." : "Lean in until your face fills the outline."}`
-    : `<b>Bring one eye to the camera</b>${trackerReady() ? "The ring follows your eye. The check starts on its own." : "Lean in until the colored part of one eye fills the ring."}<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
+    : `<b>Put one eye in the outline</b>Line the coloured part of your eye up with the circle, so it fills it.${trackerReady() ? " The check starts on its own." : ""}<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
   startTracking(selfie ? "selfie" : "close");
 }
 

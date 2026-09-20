@@ -9,19 +9,18 @@
 .guide.selfie { width: 44vh; height: 58vh; }
 .guide.close { display: none; }
 .guide.locked { border-color: var(--ok); border-style: solid; }
-/* Iris ring. Before tracking it is a target at the centre; once the tracker has the eye it
-   sits on the iris at true size and becomes a readout. */
+/* The target. A fixed white outline in the middle of the screen: the person brings their
+   eye to it, which is what pins the working distance. It never moves; only its colour
+   changes, to green, once the eye is lined up. */
 .ring { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  border: 2px solid rgba(255,255,255,.85); border-radius: 50%; pointer-events: none;
-  box-shadow: 0 0 0 1px rgba(0,0,0,.35);
-  transition: width var(--fast) var(--ease), height var(--fast) var(--ease),
-              left var(--fast) var(--ease), top var(--fast) var(--ease), border-color var(--fast); }
-.ring.tracked { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 0 26px var(--accent-soft); }
-.ring.tracked.near { border-color: var(--ok); box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 0 30px var(--ok-soft); }
-.ring.tracked .eye { opacity: .3; }
+  border: 3px solid #fff; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 0 24px rgba(0,0,0,.45);
+  transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease); }
+.ring.locked { border-color: var(--ok); box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 0 30px var(--ok-soft); }
+.ring.locked .eye { border-color: var(--ok); opacity: .9; }
 
 /* Live readout while tracking. */
-.hud { position: absolute; left: 50%; bottom: 122px; transform: translateX(-50%);
+.hud { position: absolute; left: 50%; bottom: 186px; transform: translateX(-50%);
   display: flex; align-items: center; gap: 12px; padding: 11px 18px 11px 14px;
   background: rgba(10,12,16,.78); backdrop-filter: blur(14px); color: var(--text);
   border: 1px solid var(--line); border-radius: 999px; pointer-events: none;
@@ -38,7 +37,7 @@
    meeting at a point each side. Built from one square rotated 45 degrees, with only the
    opposite corners rounded, which leaves the left and right corners sharp. */
 .ring .eye { position: absolute; left: 50%; top: 50%; width: 112%; height: 112%;
-  border: 2px solid rgba(255,255,255,.5); border-radius: 0 78% 0 78%;
+  border: 2px solid rgba(255,255,255,.75); border-radius: 0 78% 0 78%;
   /* Applied right to left: rotate the square 45 degrees so the two square corners become
      the eye's inner and outer corners, then stretch sideways so it is wider than tall. */
   transform: translate(-50%, -50%) scaleX(1.7) rotate(-45deg); }
