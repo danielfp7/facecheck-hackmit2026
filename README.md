@@ -11,6 +11,34 @@ A Duo-style second factor that proves a **live human** is holding the phone, not
 7. **Vibration** (informational until tuned): three haptic bursts at server-chosen random times, with gyro and accelerometer logged on the camera's clock. The server checks the sensor felt each burst, whether the video jittered at those instants, and whether image motion follows the gyro overall. Injected video does neither.
 8. Verdict: **verified**, **unverified** (with the failing signal named) or **unverifiable**.
 
+## Live URL
+
+```
+https://disclaimer-protecting-talked-newcastle.trycloudflare.com
+```
+
+That is a Cloudflare quick tunnel to the server running on this Mac, started with:
+
+```sh
+cloudflared tunnel --url http://localhost:8000
+```
+
+HTTPS is the point: browsers refuse the camera on plain HTTP from anything but localhost, so
+a phone or a judge's laptop needs this rather than the LAN address. **The URL changes every
+time the tunnel restarts, and it dies when the Mac sleeps or the server stops.** Re-run the
+command and paste the new URL. The Mac has to stay awake and on the network for the whole
+demo.
+
+**Why not Vercel.** It only suits the static pages, and the static pages are not the product:
+
+- The server carries about 425 MB of dependencies (InsightFace, onnxruntime, OpenCV) against
+  Vercel's 250 MB limit for a serverless function.
+- A check takes 5 to 9 seconds to analyse. Vercel's Hobby plan stops a function at 10.
+- Every check writes a capture folder, and serverless storage does not persist.
+
+A container host (Fly.io, Render, Railway) would run it as-is. That is a job for after the
+hackathon; the tunnel is what gets a URL in front of a judge today.
+
 ## Steps, in order
 
 Where things stand: the app builds with Xcode 27 and runs on an iPhone 14 Pro, and genuine users verify end to end on real captures. Vibration is built but untuned, and no deepfake attack has been run against the phone yet, so section D is the work that remains. Sections A to C are for setting up another Mac or phone. Details for each step are in the sections below.
