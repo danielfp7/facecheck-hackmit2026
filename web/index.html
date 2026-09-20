@@ -3,210 +3,276 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
-<title>Northwind Business: approve wire</title>
+<meta name="color-scheme" content="light">
+<title>Approve wire · Northwind Business</title>
 <style>
+  /* ---- Northwind Business: the relying party. Light, quiet, bank-like. ---- */
   :root {
-    --bg: #f3f4f7; --card: #ffffff; --ink: #0f172a; --muted: #64748b; --line: #e2e6ee; --line-strong: #c9d1de;
-    --brand: #1e3fae; --brand-ink: #ffffff; --brand-soft: #e8edfb;
-    --green: #0c7a4f; --green-bg: #e6f6ee; --red: #b42318; --red-bg: #fdecea;
-    --amber: #a15c00; --amber-bg: #fff4d6; --blue: #1d4ed8; --blue-bg: #e9f0ff;
-    --code-bg: #eef1f6;
-    --shadow: 0 1px 2px rgba(15,23,42,.04), 0 10px 30px -18px rgba(15,23,42,.18);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0b0f17; --card: #131926; --ink: #e6e9ef; --muted: #98a2b3; --line: #222a3a; --line-strong: #34405a;
-      --brand: #6d8dff; --brand-ink: #0b0f17; --brand-soft: #1a2340;
-      --green: #3ed39a; --green-bg: #0f2b22; --red: #ff8a7a; --red-bg: #3a1815;
-      --amber: #f2c14e; --amber-bg: #362b0e; --blue: #8fb0ff; --blue-bg: #17223c;
-      --code-bg: #1b2333;
-      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.6);
-    }
+    --bg: #f3f5f8; --card: #ffffff; --ink: #0f1728; --muted: #5b6678; --faint: #8b95a7;
+    --line: #e4e8ef; --line-strong: #cbd2de;
+    --navy: #0c1e3e; --brand: #1d4ed8;
+    --ok: #077a4a; --ok-bg: #e8f7ef; --ok-line: #a5dec0;
+    --bad: #b42318; --bad-bg: #fdf0ee; --bad-line: #f2b6ae;
+    --warn: #b04a06; --warn-bg: #fff6e5; --warn-line: #f4d391;
+    --info: #1b56c9; --info-bg: #eaf1ff;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 10px 28px -18px rgba(16,24,40,.22);
+
+    /* ---- InHuman widget. Mirrors web/app/tokens.css so it reads as the same product. ---- */
+    --ih-bg: #0a0c10; --ih-surface: #11141a; --ih-raised: #171b23; --ih-line: #232936;
+    --ih-text: #eceff5; --ih-text-2: #9aa3b5; --ih-text-3: #5f6878;
+    --ih-accent: #6e8bff; --ih-accent-soft: rgba(110,139,255,.14);
+    --ih-ok: #35d49a; --ih-ok-soft: rgba(53,212,154,.13);
+    --ih-bad: #ff5d5d; --ih-bad-soft: rgba(255,93,93,.13);
+    --ih-warn: #ffb547; --ih-warn-soft: rgba(255,181,71,.13);
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
-    -webkit-font-smoothing: antialiased; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
   a { color: var(--brand); }
-  h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -.012em; }
   p { margin: 0; }
-  code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code-bg);
-    padding: 1px 6px; border-radius: 6px; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+  code { font: 12px/1.4 var(--mono); overflow-wrap: anywhere; }
+  [hidden] { display: none !important; }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+  @media (max-width: 480px) { .wrap { padding: 0 16px; } }
   .num { font-variant-numeric: tabular-nums; }
+  .eyebrow { font: 600 11px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
   svg.i { width: 18px; height: 18px; flex: none; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
 
   /* Top bar */
-  .topbar { background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
-  .topbar .wrap { height: 56px; display: flex; align-items: center; gap: 28px; }
-  .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; font-size: 16px; }
-  .brand .mark { width: 28px; height: 28px; border-radius: 8px; background: var(--brand); color: var(--brand-ink);
-    display: grid; place-items: center; }
-  .brand .mark svg { width: 18px; height: 18px; }
-  .brand .biz { color: var(--muted); font-weight: 500; }
-  nav.tabs { display: flex; gap: 4px; height: 100%; }
-  nav.tabs a { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); text-decoration: none;
-    font-weight: 500; border-bottom: 2px solid transparent; }
-  nav.tabs a.on { color: var(--ink); border-bottom-color: var(--brand); }
-  nav.tabs .badge { background: var(--brand); color: var(--brand-ink); font-size: 11px; font-weight: 700; padding: 0 6px;
-    border-radius: 999px; line-height: 18px; }
+  .topbar { background: var(--navy); color: #fff; position: sticky; top: 0; z-index: 5; }
+  .topbar .wrap { height: 58px; display: flex; align-items: center; gap: 30px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; font-weight: 700; font-size: 16px; letter-spacing: -.01em; }
+  .brand .mark { width: 28px; height: 28px; border-radius: 8px; background: #fff; color: var(--navy); display: grid; place-items: center; }
+  .brand .mark svg { width: 17px; height: 17px; }
+  .brand .biz { color: rgba(255,255,255,.62); font-weight: 500; }
+  nav.tabs { display: flex; gap: 2px; height: 100%; }
+  nav.tabs a { display: flex; align-items: center; gap: 6px; padding: 0 11px; color: rgba(255,255,255,.72); text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; }
+  nav.tabs a.on { color: #fff; border-bottom-color: #8fb0ff; }
+  nav.tabs .badge { background: #ff8a5b; color: #1a0c04; font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 999px; line-height: 18px; }
   .me { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-  .me .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-soft); color: var(--brand);
-    display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+  .me .avatar { width: 32px; height: 32px; border-radius: 50%; background: #23407a; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
   .me b { display: block; font-size: 13px; line-height: 1.2; }
-  .me small { color: var(--muted); font-size: 12px; }
-  @media (max-width: 760px) { nav.tabs, .me div { display: none; } }
+  .me small { color: rgba(255,255,255,.62); font-size: 12px; }
+  .env { font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #ffd39b; border: 1px solid rgba(255,211,155,.4); padding: 5px 7px; border-radius: 6px; margin-right: 4px; }
+  @media (max-width: 900px) { nav.tabs, .me div, .env { display: none; } }
 
   /* Page head */
-  main { padding: 24px 0 56px; }
-  .crumbs { color: var(--muted); font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .crumbs span:last-child { color: var(--ink); font-weight: 500; }
-  .pagehead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: 6px 0 18px; flex-wrap: wrap; }
-  .pagehead h1 { font-size: 24px; }
-  .pagehead .sub { color: var(--muted); margin-top: 2px; }
-  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-weight: 600;
-    font-size: 13px; border: 1px solid var(--line-strong); background: var(--card); white-space: nowrap; }
+  main { padding: 22px 0 48px; }
+  .crumbs { color: var(--faint); font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .crumbs span:last-child { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .pagehead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: 8px 0 18px; flex-wrap: wrap; }
+  .pagehead h1 { font-size: 26px; }
+  .pagehead .sub { color: var(--muted); margin-top: 3px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 13px; border-radius: 999px; font-weight: 600; font-size: 13px;
+    border: 1px solid var(--line-strong); background: var(--card); white-space: nowrap; color: var(--muted); }
   .chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-  .chip.info { color: var(--blue); background: var(--blue-bg); border-color: transparent; }
+  .chip.info { color: var(--info); background: var(--info-bg); border-color: transparent; }
   .chip.info::before { animation: pulse 1.2s ease-in-out infinite; }
-  .chip.ok { color: var(--green); background: var(--green-bg); border-color: transparent; }
-  .chip.bad { color: var(--red); background: var(--red-bg); border-color: transparent; }
-  .chip.warn { color: var(--amber); background: var(--amber-bg); border-color: transparent; }
+  .chip.ok { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+  .chip.bad { color: var(--bad); background: var(--bad-bg); border-color: transparent; }
+  .chip.warn { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
 
   /* Progress steps */
   ol.steps { list-style: none; margin: 0 0 20px; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  ol.steps li { border-top: 3px solid var(--line-strong); padding-top: 8px; }
+  ol.steps li { border-top: 3px solid var(--line-strong); padding-top: 9px; transition: border-color .3s; }
   ol.steps b { display: block; font-size: 13px; font-weight: 600; }
   ol.steps small { color: var(--muted); font-size: 12px; }
-  ol.steps li.done { border-top-color: var(--green); }
+  ol.steps li.done { border-top-color: var(--ok); }
   ol.steps li.current { border-top-color: var(--brand); }
-  ol.steps li.active { border-top-color: var(--blue); animation: pulse 1.2s ease-in-out infinite; }
-  ol.steps li.failed { border-top-color: var(--red); }
-  ol.steps li.hold { border-top-color: var(--amber); }
-  @media (max-width: 560px) { ol.steps small { display: none; } }
+  ol.steps li.active { border-top-color: var(--info); animation: pulse 1.2s ease-in-out infinite; }
+  ol.steps li.failed { border-top-color: var(--bad); }
+  ol.steps li.hold { border-top-color: var(--warn); }
+  @media (max-width: 600px) { ol.steps small { display: none; } }
 
   /* Layout */
-  .grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); gap: 20px; align-items: start; }
-  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(360px, 1fr); gap: 22px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+  .side { position: sticky; top: 78px; min-width: 0; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .side { position: static; order: -1; } }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
-  .card > .head { padding: 16px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .card > .head { padding: 15px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .card > .head h2 { font-size: 15px; }
-  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 
   /* Transfer details */
-  .hero { padding: 22px 22px 18px; border-bottom: 1px solid var(--line); }
-  .amount { font-size: 38px; font-weight: 650; letter-spacing: -.03em; line-height: 1.1; }
-  .amount small { font-size: 16px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-left: 8px; }
-  @media (max-width: 480px) { .amount { font-size: 30px; } .amount small { font-size: 14px; } }
-  .hero .to { margin-top: 6px; color: var(--muted); }
+  .hero { padding: 22px 22px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+  .amount { font-size: 40px; font-weight: 650; letter-spacing: -.03em; line-height: 1.05; }
+  .amount small { font-size: 15px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-left: 8px; }
+  @media (max-width: 480px) { .amount { font-size: 30px; } .amount small { font-size: 13px; } }
+  .hero .to { margin-top: 8px; color: var(--muted); }
   .hero .to b { color: var(--ink); font-weight: 600; }
-  dl.kv { margin: 0; padding: 18px 22px; display: grid; grid-template-columns: 170px 1fr; row-gap: 12px; column-gap: 16px; }
+  .hero .route { display: flex; align-items: center; gap: 8px; color: var(--faint); font-size: 12px; font-family: var(--mono); white-space: nowrap; }
+  .hero .route svg { width: 14px; height: 14px; }
+  dl.kv { margin: 0; padding: 16px 22px; display: grid; grid-template-columns: 160px 1fr; row-gap: 11px; column-gap: 16px; }
   dl.kv dt { color: var(--muted); }
   dl.kv dd { margin: 0; }
-  dl.kv dd small { color: var(--muted); }
-  @media (max-width: 560px) { dl.kv { grid-template-columns: 1fr; row-gap: 4px; } dl.kv dd { margin-bottom: 8px; } }
-  .memo { margin: 0 22px 18px; padding: 12px 14px; border-left: 3px solid var(--amber); background: var(--amber-bg);
-    border-radius: 0 10px 10px 0; color: var(--ink); }
-  .memo .eyebrow { color: var(--amber); margin-bottom: 4px; }
+  dl.kv dd small { color: var(--faint); }
+  @media (max-width: 560px) { dl.kv { grid-template-columns: 1fr; row-gap: 3px; } dl.kv dd { margin-bottom: 9px; } }
+  .memo { margin: 2px 22px 16px; padding: 12px 14px; border-left: 3px solid var(--warn); background: var(--warn-bg); border-radius: 0 10px 10px 0; }
+  .memo .eyebrow { color: var(--warn); margin-bottom: 4px; }
   .flags { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 22px 20px; }
-  .flag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
-    color: var(--amber); background: var(--amber-bg); }
+  .flag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--warn); background: var(--warn-bg); }
   .flag svg { width: 14px; height: 14px; }
 
-  /* Approval panel */
-  .approve { position: sticky; top: 76px; }
-  .approve .body { padding: 20px 22px 22px; display: flex; flex-direction: column; gap: 14px; }
-  .approve h2 { font-size: 18px; }
-  .approve .lead { color: var(--muted); }
-  .approve .lead b { color: var(--ink); font-weight: 600; }
-  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
-  input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: transparent;
-    color: var(--ink); font-size: 15px; font-family: inherit; }
-  input:focus { outline: 2px solid var(--brand); outline-offset: -1px; border-color: transparent; }
-  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media (max-width: 400px) { .fields { grid-template-columns: 1fr; } }
-  .choices { display: flex; flex-direction: column; gap: 10px; }
-  button { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 16px; border: 0;
-    border-radius: 10px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
-  button.primary { background: var(--brand); color: var(--brand-ink); }
-  button.alt { background: transparent; color: var(--ink); border: 1px solid var(--line-strong); }
-  button:disabled { opacity: .5; cursor: default; }
-  .fine { color: var(--muted); font-size: 12px; }
-  .powered { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
-  .powered svg { width: 16px; height: 16px; color: var(--brand); }
+  /* Decision band: what the bank did with the verdict */
+  .decision { animation: rise .35s cubic-bezier(.2,.8,.2,1) both; overflow: hidden; }
+  .decision .top { padding: 18px 22px; display: flex; gap: 16px; align-items: flex-start; }
+  .decision .glyph { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; animation: pop .45s cubic-bezier(.2,.8,.2,1) both; }
+  .decision .glyph svg { width: 24px; height: 24px; }
+  .decision h2 { font-size: 20px; }
+  .decision .top p { color: var(--muted); margin-top: 3px; }
+  .decision.ok .glyph { background: var(--ok); color: #fff; } .decision.ok h2 { color: var(--ok); }
+  .decision.bad .glyph { background: var(--bad); color: #fff; } .decision.bad h2 { color: var(--bad); }
+  .decision.warn .glyph { background: var(--warn); color: #fff; } .decision.warn h2 { color: var(--warn); }
+  .decision.ok { border-color: var(--ok-line); } .decision.bad { border-color: var(--bad-line); } .decision.warn { border-color: var(--warn-line); }
+  .versus { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; padding: 18px 22px; align-items: stretch; border-top: 1px solid var(--line); }
+  .versus .cell { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .versus .cell.ours { background: #f8f9fc; border-color: var(--line-strong); }
+  .versus .big { font-size: 24px; font-weight: 650; letter-spacing: -.02em; line-height: 1.15; }
+  .versus .big small { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 6px; }
+  .versus .sm { color: var(--muted); font-size: 12.5px; }
+  .versus .vs { align-self: center; color: var(--faint); font: 700 11px var(--mono); letter-spacing: .1em; }
+  .versus .ok .big { color: var(--ok); } .versus .bad .big { color: var(--bad); } .versus .warn .big { color: var(--warn); }
+  .meter { margin-top: 4px; }
+  .meter .bar { position: relative; height: 8px; border-radius: 999px; background: #e9edf4; }
+  .meter .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--ok); }
+  .meter .fill.bad { background: var(--bad); }
+  .meter .tick { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); border-radius: 1px; }
+  .meter .scale { position: relative; height: 16px; margin-top: 4px; font-size: 11px; color: var(--faint); font-family: var(--mono); }
+  .meter .scale span { position: absolute; top: 0; } .meter .scale .r { right: 0; } .meter .scale .pass { transform: translateX(-50%); white-space: nowrap; color: var(--muted); }
+  .say { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; margin-top: 2px; }
+  .say svg { width: 14px; height: 14px; flex: none; }
+  .say.ok { color: var(--ok); } .say.bad { color: var(--bad); } .say.warn { color: var(--warn); }
+  .strip { display: flex; gap: 10px; align-items: center; padding: 12px 22px; font-weight: 600; border-top: 1px solid var(--line); }
+  .strip svg { width: 16px; height: 16px; flex: none; }
+  .strip.ok { color: var(--ok); background: var(--ok-bg); } .strip.bad { color: var(--bad); background: var(--bad-bg); } .strip.warn { color: var(--warn); background: var(--warn-bg); }
+  .strip.flat { color: var(--muted); }
+  @media (max-width: 640px) { .versus { grid-template-columns: 1fr; } .versus .vs { justify-self: center; } }
 
-  /* Status: waiting */
-  #status { margin-top: 20px; display: none; }
-  .wait { padding: 22px; display: flex; gap: 18px; align-items: flex-start; }
-  .wait h2 { font-size: 17px; }
-  .wait p { color: var(--muted); margin-top: 2px; }
-  .wait .how { margin: 12px 0 0; padding: 0 0 0 18px; color: var(--muted); display: flex; gap: 20px; flex-wrap: wrap; }
-  .wait .how li { padding-right: 4px; }
-  .wait .reqid { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
-  @media (max-width: 640px) { .wait { flex-wrap: wrap; } .wait .reqid { margin-left: 0; } }
-  .spinner { width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--blue); border-right-color: transparent;
-    animation: spin .9s linear infinite; flex: none; margin-top: 2px; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes pulse { 50% { opacity: .35; } }
+  /* Activity log */
+  .activity ol { list-style: none; margin: 0; padding: 6px 22px 14px; }
+  .activity li { display: grid; grid-template-columns: 64px 14px 1fr; column-gap: 12px; padding: 9px 0; position: relative; animation: rise .3s ease both; }
+  .activity li + li::before { content: ""; position: absolute; left: 82px; top: -9px; height: 18px; width: 1px; background: var(--line); }
+  .activity time { font: 12px/1.6 var(--mono); color: var(--faint); }
+  .activity .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); margin-top: 6px; justify-self: center; }
+  .activity .dot.ok { background: var(--ok); } .activity .dot.bad { background: var(--bad); } .activity .dot.warn { background: var(--warn); } .activity .dot.info { background: var(--info); }
+  .activity b { font-weight: 600; }
+  .activity .d { color: var(--muted); font-size: 12.5px; }
+  .activity .d code { color: var(--muted); }
+  @media (max-width: 480px) { .activity li { grid-template-columns: 14px 1fr; } .activity time { grid-column: 2; order: 3; } .activity li + li::before { left: 6px; } }
 
-  /* Status: verification report */
-  .report { overflow: hidden; }
-  .verdict { padding: 20px 22px; display: flex; gap: 16px; align-items: center; }
-  .verdict .mark { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; flex: none; }
-  .verdict .mark svg { width: 26px; height: 26px; }
-  .verdict h2 { font-size: 20px; }
-  .verdict p { margin-top: 2px; }
-  .verdict img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex: none; margin-left: auto;
-    border: 2px solid var(--card); box-shadow: 0 0 0 1px var(--line-strong); }
-  .verdict.ok { background: var(--green-bg); color: var(--green); }
-  .verdict.bad { background: var(--red-bg); color: var(--red); }
-  .verdict.warn { background: var(--amber-bg); color: var(--amber); }
-  .verdict.ok .mark { background: var(--green); color: #fff; }
-  .verdict.bad .mark { background: var(--red); color: #fff; }
-  .verdict.warn .mark { background: var(--amber); color: #fff; }
-  .outcome { padding: 14px 22px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
-  .outcome b { font-size: 15px; }
-  .outcome span { color: var(--muted); }
-  .compare { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: stretch; padding: 18px 22px; border-bottom: 1px solid var(--line); }
-  .compare .cell { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-  .compare .cell.hi { border-color: var(--line-strong); background: var(--bg); }
-  .compare .big { font-size: 18px; font-weight: 650; margin: 4px 0 2px; }
-  .compare .sm { color: var(--muted); font-size: 12px; }
-  .compare .vs { align-self: center; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
-  .compare .ok .big { color: var(--green); } .compare .bad .big { color: var(--red); } .compare .warn .big { color: var(--amber); }
-  @media (max-width: 640px) { .compare { grid-template-columns: 1fr; } .compare .vs { justify-self: center; } }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; padding: 18px 22px; }
-  .tile { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
-  .tile .name { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--muted); }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
-  .dot.green { background: var(--green); } .dot.red { background: var(--red); } .dot.yellow { background: var(--amber); }
-  .tile .headline { font-size: 17px; font-weight: 650; margin-top: 4px; }
-  .tile .detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .meta { padding: 12px 22px 16px; color: var(--muted); font-size: 12px; display: flex; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); min-width: 0; }
-  .meta code { overflow-wrap: anywhere; }
-  .error { padding: 18px 22px; color: var(--red); background: var(--red-bg); }
-  .error h2 { font-size: 16px; }
+  /* Approval card: bank head, InHuman body */
+  .approve > .head { align-items: flex-start; }
+  .approve .head p { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .approve .head b { color: var(--ink); font-weight: 600; }
+  .linkbtn { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: 12.5px; text-decoration: underline; cursor: pointer; white-space: nowrap; }
+  .linkbtn:hover { color: var(--bad); }
 
-  footer.foot { border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; padding: 18px 0; }
-  footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  @media (prefers-reduced-motion: reduce) { .spinner, .chip.info::before, ol.steps li.active { animation: none; } }
+  .ih { background: var(--ih-bg); color: var(--ih-text); border-radius: 0 0 13px 13px; padding: 16px 20px 18px; }
+  .ih-head { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--ih-line); }
+  .ih-mark { width: 30px; height: 30px; color: var(--ih-accent); flex: none; }
+  .ih-brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; line-height: 1.1; }
+  .ih-brand small { display: block; font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ih-text-3); margin-top: 4px; }
+  .ih-for { margin-left: auto; text-align: right; font-size: 12px; color: var(--ih-text-2); }
+  .ih-for span { display: block; font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ih-text-3); margin-bottom: 4px; }
+  .ih-body { padding-top: 16px; display: flex; flex-direction: column; gap: 14px; animation: rise .3s ease both; }
+  .ih h3 { font-size: 17px; font-weight: 650; color: var(--ih-text); }
+  .ih .lead { color: var(--ih-text-2); }
+  .ih .lead b { color: var(--ih-text); font-weight: 600; }
+  .ih .lead a { color: var(--ih-accent); }
+  .ih label { display: block; font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ih-text-3); margin-bottom: 6px; }
+  .ih input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--ih-line); background: var(--ih-surface); color: var(--ih-text); font: 15px var(--font); }
+  .ih input:focus { outline: 2px solid var(--ih-accent); outline-offset: -1px; border-color: transparent; }
+  .ih .btns { display: flex; flex-direction: column; gap: 9px; }
+  .ih button { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 16px; border: 0; border-radius: 10px;
+    font: 600 15px var(--font); cursor: pointer; transition: transform .12s ease, filter .12s ease; }
+  .ih button:active { transform: scale(.99); }
+  .ih button.primary { background: var(--ih-accent); color: #0a0c10; }
+  .ih button.primary:hover { filter: brightness(1.08); }
+  .ih button.secondary { background: transparent; color: var(--ih-text); border: 1px solid var(--ih-line); }
+  .ih button.secondary:hover { background: var(--ih-raised); }
+  .ih button:disabled { opacity: .5; cursor: default; }
+  .ih .fine { color: var(--ih-text-3); font-size: 12px; }
+  .ih .foot { display: flex; gap: 8px; align-items: center; color: var(--ih-text-3); font-size: 11.5px; padding-top: 12px; border-top: 1px solid var(--ih-line); }
+  .ih .foot svg { width: 14px; height: 14px; flex: none; }
+  .ih .foot .mode { margin-left: auto; font: 600 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ih-bad); }
+  .ih .dim { color: var(--ih-text-3); }
+
+  /* Widget: waiting */
+  .ih .scan { position: relative; height: 3px; border-radius: 2px; background: var(--ih-line); overflow: hidden; }
+  .ih .scan::after { content: ""; position: absolute; inset: 0; width: 34%; border-radius: 2px; background: var(--ih-accent); animation: slide 1.5s cubic-bezier(.4,0,.6,1) infinite; }
+  .ih .waithead { display: flex; align-items: center; gap: 12px; }
+  .ih .ring { width: 40px; height: 40px; border-radius: 50%; border: 2.5px solid var(--ih-accent-soft); border-top-color: var(--ih-accent); animation: spin 1.1s linear infinite; flex: none; }
+  .ih .how { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .ih .how li { display: flex; gap: 10px; align-items: baseline; color: var(--ih-text-2); }
+  .ih .how li i { font: 600 10px/19px var(--mono); width: 19px; height: 19px; border-radius: 50%; border: 1px solid var(--ih-line); text-align: center; color: var(--ih-text-3); flex: none; font-style: normal; }
+  .ih .how li b { color: var(--ih-text); font-weight: 600; }
+  .ih .kv { display: flex; justify-content: space-between; gap: 12px; font: 12px var(--mono); color: var(--ih-text-3); flex-wrap: wrap; }
+  .ih .kv b { color: var(--ih-text-2); font-weight: 500; }
+
+  /* Widget: verdict */
+  .ih .vhead { display: flex; gap: 14px; align-items: center; }
+  .ih .vmark { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; flex: none; animation: pop .5s cubic-bezier(.2,.8,.2,1) both; }
+  .ih .vmark svg { width: 26px; height: 26px; }
+  .ih .vmark path { stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .45s .2s ease forwards; }
+  .ih .vmark.ok { background: var(--ih-ok-soft); color: var(--ih-ok); box-shadow: 0 0 0 1px rgba(53,212,154,.35), 0 0 36px -6px rgba(53,212,154,.45); }
+  .ih .vmark.bad { background: var(--ih-bad-soft); color: var(--ih-bad); box-shadow: 0 0 0 1px rgba(255,93,93,.35), 0 0 36px -6px rgba(255,93,93,.45); }
+  .ih .vmark.warn { background: var(--ih-warn-soft); color: var(--ih-warn); box-shadow: 0 0 0 1px rgba(255,181,71,.35), 0 0 36px -6px rgba(255,181,71,.45); }
+  .ih .vhead h3 { font-size: 19px; }
+  .ih .vhead h3.ok { color: var(--ih-ok); } .ih .vhead h3.bad { color: var(--ih-bad); } .ih .vhead h3.warn { color: var(--ih-warn); }
+  .ih .vhead p { color: var(--ih-text-2); margin-top: 3px; }
+  .ih .selfie { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex: none; margin-left: auto; border: 2px solid var(--ih-line); background: var(--ih-raised); }
+  .ih .evidence { display: grid; gap: 1px; background: var(--ih-line); border: 1px solid var(--ih-line); border-radius: 10px; overflow: hidden; }
+  .ih .ev { display: grid; grid-template-columns: 9px 108px 1fr; gap: 10px; align-items: baseline; padding: 9px 12px; background: var(--ih-surface); }
+  .ih .ev i { width: 8px; height: 8px; border-radius: 50%; background: var(--ih-text-3); align-self: center; }
+  .ih .ev i.green { background: var(--ih-ok); } .ih .ev i.red { background: var(--ih-bad); } .ih .ev i.yellow { background: var(--ih-warn); }
+  .ih .ev .n { font: 600 10.5px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ih-text-3); }
+  .ih .ev .h { font-weight: 600; font-size: 13px; }
+  .ih .ev .h.red { color: var(--ih-bad); }
+  .ih .ev .d { font-size: 11.5px; color: var(--ih-text-3); margin-top: 1px; }
+  .ih .links { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 13px; }
+  .ih .links a { color: var(--ih-accent); text-decoration: none; font-weight: 600; }
+  .ih .links a:hover { text-decoration: underline; }
+  .ih .links button.text { width: auto; padding: 0; background: none; border: 0; color: var(--ih-text-2); font: 500 13px var(--font); margin-left: auto; }
+  .ih .links button.text:hover { color: var(--ih-text); }
+  .ih .tech { font: 11.5px/1.5 var(--mono); color: var(--ih-text-3); overflow-wrap: anywhere; }
+  .ih .tech b { font-weight: 600; letter-spacing: .06em; text-transform: uppercase; font-size: 10px; margin-right: 6px; }
+  .ih .err { padding: 12px 14px; border-radius: 10px; background: var(--ih-bad-soft); color: var(--ih-bad); border: 1px solid rgba(255,93,93,.3); }
+  .ih .err b { display: block; margin-bottom: 2px; }
+  .ih .err span { color: var(--ih-text-2); }
+
+  footer.foot { border-top: 1px solid var(--line); color: var(--faint); font-size: 12px; padding: 18px 0 28px; }
+  footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+  footer details { color: var(--faint); }
+  footer summary { cursor: pointer; list-style: none; }
+  footer summary::-webkit-details-marker { display: none; }
+  footer summary::after { content: " ▾"; }
+  footer details[open] summary::after { content: " ▴"; }
+  footer .demo { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  footer select { font: 12px var(--mono); padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); max-width: 100%; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; } }
 </style>
 </head>
 <body>
 
 <header class="topbar">
   <div class="wrap">
-    <a class="brand" href="#">
-      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/></svg></span>
+    <a class="brand" href="#" aria-label="Northwind Business">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
       <span>Northwind</span><span class="biz">Business</span>
     </a>
     <nav class="tabs" aria-label="Sections">
       <a href="#">Overview</a><a href="#">Payments</a><a href="#" class="on">Approvals <span class="badge">1</span></a><a href="#">Cards</a><a href="#">Reports</a>
     </nav>
-    <div class="me"><div class="avatar">DP</div><div><b>Daniel Pacheco</b><small>Finance · Payment approver</small></div></div>
+    <div class="me"><span class="env">Demo</span><div class="avatar">DP</div><div><b>Daniel Pacheco</b><small>Finance · Payment approver</small></div></div>
   </div>
 </header>
 
@@ -218,195 +284,449 @@
   </div>
 
   <ol class="steps" aria-label="Progress">
-    <li class="done"><b>Created</b><small>Finance operations, 09:41</small></li>
-    <li class="done"><b>Reviewed</b><small>Dual control, 09:52</small></li>
+    <li class="done"><b>Created</b><small>Finance operations · 09:41</small></li>
+    <li class="done"><b>Reviewed</b><small>Dual control · 09:52</small></li>
     <li id="stepApprove" class="current"><b>Approval</b><small id="stepApproveSub">You · live-person check</small></li>
-    <li id="stepRelease"><b>Release</b><small>SWIFT, before 17:00 ET</small></li>
+    <li id="stepRelease"><b>Release</b><small id="stepReleaseSub">SWIFT · before 17:00 ET</small></li>
   </ol>
 
   <div class="grid">
-    <section class="card details" aria-label="Transfer details">
-      <div class="head"><h2>Transfer details</h2><span class="eyebrow">Outgoing · USD</span></div>
-      <div class="hero">
-        <div class="amount num">$25,600,000.00<small>USD</small></div>
-        <p class="to">to <b>Kestrel Holdings (HK) Limited</b> · East Harbour Bank, Hong Kong</p>
-      </div>
-      <dl class="kv">
-        <dt>Beneficiary</dt><dd>Kestrel Holdings (HK) Limited <small>· added today</small></dd>
-        <dt>Beneficiary bank</dt><dd>East Harbour Bank, Hong Kong <small class="num">· SWIFT EHBKHKHH · <span style="white-space:nowrap">account ···· 4471</span></small></dd>
-        <dt>From account</dt><dd>Operating · USD <span class="num">···· 2210</span> <small class="num">· available $31,204,118.52</small></dd>
-        <dt>Reference</dt><dd>Project Kestrel · <span class="num">INV-2026-0918</span></dd>
-        <dt>Initiated by</dt><dd>Finance operations <small>· 09:41 today</small></dd>
-        <dt>Fees</dt><dd class="num">$45.00 <small>· charged to sender (OUR)</small></dd>
-      </dl>
-      <div class="memo">
-        <div class="eyebrow">Memo from initiator</div>
-        “Confidential acquisition payment. Approved by the CFO on this morning's video call. Please release before cutoff.”
-      </div>
-      <div class="flags" aria-label="Risk flags">
-        <span class="flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.5 17.5a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>New beneficiary</span>
-        <span class="flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.5 17.5a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>Above $1,000,000 policy limit</span>
-        <span class="flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.5 17.5a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>Urgent, confidential</span>
-      </div>
-    </section>
+    <div class="col">
+      <section id="decision" class="card decision" hidden aria-live="polite"></section>
 
-    <aside class="card approve" aria-label="Approval">
-      <div class="body">
-        <div>
-          <div class="eyebrow">Step-up verification</div>
-          <h2>Confirm it's really you</h2>
+      <section class="card details" aria-label="Transfer details">
+        <div class="head"><h2>Transfer details</h2><span class="eyebrow">Outgoing · USD · SWIFT</span></div>
+        <div class="hero">
+          <div>
+            <div class="amount num">$25,600,000.00<small>USD</small></div>
+            <p class="to">to <b>Kestrel Holdings (HK) Limited</b> · East Harbour Bank, Hong Kong</p>
+          </div>
+          <div class="route num"><span>Operating ···· 2210</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg><span>EHBKHKHH ···· 4471</span></div>
         </div>
-        <p class="lead">Wires above <b>$1,000,000</b> need a live-person check. InHuman confirms a real human is at the camera, not a real-time deepfake, before the funds move.</p>
-        <div class="fields">
-          <div><label for="user">Approving as</label><input id="user" value="daniel" autocomplete="off" spellcheck="false"></div>
-          <div><label for="pw">Password</label><input id="pw" type="password" value="hunter2hunter2"></div>
+        <dl class="kv">
+          <dt>Beneficiary</dt><dd>Kestrel Holdings (HK) Limited <small>· added today, first payment</small></dd>
+          <dt>Beneficiary bank</dt><dd>East Harbour Bank, Hong Kong <small class="num">· SWIFT EHBKHKHH · <span style="white-space:nowrap">account ···· 4471</span></small></dd>
+          <dt>From account</dt><dd>Operating · USD <span class="num">···· 2210</span> <small class="num">· available $31,204,118.52</small></dd>
+          <dt>Reference</dt><dd>Project Kestrel · <span class="num">INV-2026-0918</span></dd>
+          <dt>Initiated by</dt><dd>Finance operations (A. Chen) <small>· 09:41 today</small></dd>
+          <dt>Fees</dt><dd class="num">$45.00 <small>· charged to sender (OUR)</small></dd>
+        </dl>
+        <div class="memo">
+          <div class="eyebrow">Memo from initiator</div>
+          “Confidential acquisition payment. Approved by the CFO on this morning's video call. Please release before cutoff.”
         </div>
-        <div class="choices">
-          <button id="goWeb" class="primary"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Verify on this computer</button>
-          <button id="goPhone" class="alt"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>Verify on my phone</button>
+        <div class="flags" aria-label="Risk flags">
+          <span class="flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.5 17.5a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>New beneficiary</span>
+          <span class="flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.5 17.5a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>Above $1,000,000 policy limit</span>
+          <span class="flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.5 17.5a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>Authorised on a video call</span>
+          <span class="flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.5 17.5a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>Urgent, confidential</span>
         </div>
-        <p class="fine">About ten seconds. The screen flashes coloured shapes and the check reads their reflection in your eye, so sit close in a dim room with the brightness up.</p>
-        <div class="powered"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z"/><path d="m17 24 5 5 9-10"/></svg>Verification by InHuman · the result is written to the audit log</div>
-      </div>
+      </section>
+
+      <section class="card activity" aria-label="Activity">
+        <div class="head"><h2>Activity</h2><span class="eyebrow">Audit log</span></div>
+        <ol id="log">
+          <li><time>09:41:07</time><span class="dot"></span><div><b>Wire created</b><div class="d">Finance operations · A. Chen</div></div></li>
+          <li><time>09:41:52</time><span class="dot"></span><div><b>Beneficiary added</b><div class="d">Kestrel Holdings (HK) Limited · first payment to this account</div></div></li>
+          <li><time>09:52:30</time><span class="dot ok"></span><div><b>Reviewed under dual control</b><div class="d">M. Okafor · 4 risk flags acknowledged</div></div></li>
+          <li><time>09:52:31</time><span class="dot warn"></span><div><b>Step-up verification required</b><div class="d">Policy: wires above $1,000,000 need a live-person check of the approver (InHuman)</div></div></li>
+        </ol>
+      </section>
+    </div>
+
+    <aside class="side">
+      <section class="card approve" aria-label="Approval">
+        <div class="head">
+          <div><h2>Your approval</h2><p>Wires above <b>$1,000,000</b> need proof that a <b>live person</b> is approving: not a recording, not a real-time deepfake.</p></div>
+          <button id="reject" class="linkbtn" type="button">Reject wire</button>
+        </div>
+        <div class="ih" id="ih" aria-live="polite">
+          <div class="ih-head">
+            <svg class="ih-mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z" fill="currentColor" opacity=".16"/><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="m17 24 5 5 9-10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="ih-brand">InHuman<small>Live-person check</small></div>
+            <div class="ih-for"><span>Verifying for</span>Northwind Business</div>
+          </div>
+          <div class="ih-body" id="ihBody"></div>
+        </div>
+      </section>
     </aside>
   </div>
-
-  <div id="status" aria-live="polite"></div>
 </main>
 
-<footer class="foot"><div class="wrap"><span>Northwind Business Banking · demo environment</span><span>Approvals are logged with the verification evidence</span></div></footer>
+<footer class="foot"><div class="wrap">
+  <details>
+    <summary>Northwind Business Banking · demo environment</summary>
+    <div class="demo">
+      <span>Replay a saved check:</span>
+      <select id="replaySel"><option value="">Loading saved checks…</option></select>
+    </div>
+  </details>
+  <span>Approvals are stored with the verification evidence</span>
+</div></footer>
 
 <script>
+"use strict";
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let timer = null;
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fin = (v) => (typeof v === "number" && isFinite(v) ? v : null);
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const fix2 = (v) => (Math.abs(v) < 0.005 ? "0.00" : v.toFixed(2));
+const sentence = (s) => { s = String(s || "").trim(); return s ? s[0].toUpperCase() + s.slice(1) + (/[.!?]$/.test(s) ? "" : ".") : ""; };
+const clock = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 const APP_NAME = "Northwind Business";
-// ?inject[=port] on this page is passed on to the InHuman tab (attack demo: its camera becomes the live face swap).
+const AMOUNT = "$25,600,000.00";
+const PASS_MARK = 0.35;                 // server: verdict.THRESHOLDS.face_similarity_min (also sent back as face_pass_mark)
 const PARAMS = new URLSearchParams(location.search);
+// ?inject[=port] on this page is passed on to the InHuman tab (attack demo: its camera becomes the live face swap).
 const INJECT = PARAMS.has("inject") ? (PARAMS.get("inject") || "") : null;
+
+const S = { state: "idle", req: null, user: PARAMS.get("user") || localStorage.getItem("inhuman.user") || "daniel",
+            poll: null, clock: null, startedAt: 0, busy: false };
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return r.json();
+}
 function appUrl(req) {
   let u = `/app/?request=${encodeURIComponent(req.id)}&user=${encodeURIComponent(req.user)}`;
   if (INJECT !== null) u += `&inject=${encodeURIComponent(INJECT)}`;
   return u;
 }
 
+// ---------- copy: the server's reason -> plain English (same table as the InHuman results page) ----------
+// [substring of the server's reason, full sentence, short label]. First match wins, so specific keys come first.
+const COPY = [
+  ["live human, matching", "A live person, and the enrolled approver.", "Live, and the enrolled approver"],
+  ["flat screen or print", "The reflection is far too large for a human eye: a flat screen or a print, not a person.", "Reflection too large for an eye"],
+  ["reflection is far too large", "The reflection is far too large for a human eye: a flat screen or a print, not a person.", "Reflection too large for an eye"],
+  ["not inside an iris", "The screen's reflection isn't inside an iris, so it isn't coming from an eye.", "Reflection isn't inside an iris"],
+  ["no iris around it", "Something reflected the screen, but there was no iris around it.", "No iris around the reflection"],
+  ["missing in too many flashes", "The reflection in the eye went missing during too many flashes.", "Reflection missing in too many flashes"],
+  ["too few usable states", "Too few flashes could be read from the eye.", "Too few flashes could be read"],
+  ["no eye reflection found", "No reflection of the screen was found in the eye. A real cornea mirrors the screen in front of it; a generated face doesn't.", "No screen reflection in the eye"],
+  ["eye reflection does not match", "The reflection in the eye didn't move with the shapes on screen.", "Reflection didn't follow the screen"],
+  ["no light response", "The face didn't change colour with the screen's flashes, so this isn't someone sitting in front of this screen.", "Skin didn't follow the screen's light"],
+  ["response delayed", "The face reacted to the flashes too late. That delay is the time a computer needs to draw a fake face.", "Skin reacted too late"],
+  ["delayed by", "The face reacted to the flashes too late. That delay is the time a computer needs to draw a fake face.", "Skin reacted too late"],
+  ["not the person in the selfie", "The face that took the selfie isn't the face that did the eye check.", "Different face in the eye check"],
+  ["a different face appeared", "A different face appeared between the selfie and the eye check.", "A different face appeared"],
+  ["camera view jumped", "The camera view jumped between the selfie and the eye check: not one continuous move.", "Camera view jumped"],
+  ["frames are missing", "The camera feed was interrupted between the selfie and the eye check.", "Camera feed was interrupted"],
+  ["camera was interrupted", "The app was left, or the camera was interrupted, between the selfie and the eye check.", "The sitting was interrupted"],
+  ["too long between", "Too much time passed between the selfie and the eye check.", "Too long after the selfie"],
+  ["selfie does not match", "The selfie doesn't match the enrolled approver's face.", "Not the enrolled approver"],
+  ["no selfie uploaded", "No selfie came with this check, so there was no face to compare.", "No selfie to compare"],
+  ["no face found in the selfie", "No face was found in the selfie.", "No face in the selfie"],
+  ["not enrolled", "This account hasn't enrolled a face with InHuman yet.", "Not enrolled"],
+  ["ambient light", "The room is too bright for the screen's light to show on the face. Try somewhere dimmer.", "Room too bright"],
+  ["too few frames", "The camera didn't deliver enough frames during the flashes.", "Too few camera frames"],
+  ["dropped camera frames", "Too many camera frames were dropped during the check.", "Too many dropped frames"],
+  ["no eye was found", "No eye was found, so the selfie couldn't be compared with the eye check.", "No eye found"],
+  ["no face was visible right after", "No face was visible right after the selfie, so the move to the eye couldn't be followed.", "Move to the eye wasn't visible"],
+  ["too fast to follow", "The move to the eye was too fast to follow.", "Moved in too fast"],
+  ["was not recorded", "The move from the selfie to the eye wasn't recorded.", "Move to the eye wasn't recorded"],
+  ["could not be measured", "The face's response to the screen's light couldn't be measured.", "Light response not measured"],
+  ["denied", "The request was declined from the phone.", "Declined on the phone"],
+];
+const lookup = (reason) => { const s = String(reason || "").toLowerCase(); return COPY.find((row) => s.includes(row[0])) || null; };
+const friendly = (reason) => { const r = lookup(reason); return r ? r[1] : sentence(reason); };
+const friendlyShort = (reason) => { const r = lookup(reason); return r ? r[2] : sentence(reason).replace(/\.$/, ""); };
+
 const ICON = {
   ok: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg>`,
-  bad: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>`,
-  warn: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/></svg>`,
+  bad: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg>`,
+  warn: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 6v7"/><path d="M12 17.5h.01"/></svg>`,
+  lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>`,
+  screen: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>`,
+  phone: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>`,
 };
 
-// What the bank does with each InHuman verdict.
+// What InHuman says, and what the bank does about it.
 const VERDICT = {
-  verified:     { title: "Verified", tone: "ok",   outcome: "Wire released",
-                  note: "A live person matching the enrolled face approved this transfer. Queued for SWIFT release." },
-  unverified:   { title: "Not verified", tone: "bad", outcome: "Transfer blocked",
-                  note: "InHuman could not confirm a live human at the camera. The wire is held and Security has been notified." },
-  unverifiable: { title: "Couldn't verify", tone: "warn", outcome: "Transfer on hold",
-                  note: "The check could not be completed. Try again in a dimmer room with the screen at full brightness." },
-  denied:       { title: "Denied", tone: "bad", outcome: "Transfer cancelled",
-                  note: "The approval was declined from the phone." },
+  verified:     { tone: "ok",   title: "Live human verified", outcome: "Wire released",
+                  note: "A live person matching the enrolled approver confirmed this transfer. Queued for SWIFT release; Finance operations notified.",
+                  chip: "Released", step: "Live person confirmed", release: "Queued for SWIFT" },
+  unverified:   { tone: "bad",  title: "Not a live human", outcome: "Transfer blocked",
+                  note: "InHuman could not confirm a live human at the camera. The wire is held, Security has been notified, and the CFO is being called back on a known number.",
+                  chip: "Blocked", step: "Not a live person", release: "Held for Security review" },
+  unverifiable: { tone: "warn", title: "Couldn't verify", outcome: "Approval not recorded",
+                  note: "The check couldn't be completed, so nothing was approved. Try again closer to the screen, in a dimmer room, with the brightness up.",
+                  chip: "On hold", step: "Check incomplete", release: "SWIFT · before 17:00 ET" },
+  denied:       { tone: "bad",  title: "Declined", outcome: "Approval declined",
+                  note: "The request was declined from the phone. The wire stays pending and nothing has moved.",
+                  chip: "Declined", step: "Declined on the phone", release: "SWIFT · before 17:00 ET" },
 };
-
-const CHIP = { idle: ["", "Awaiting your approval"], pending: ["info", "Verifying approver"], verified: ["ok", "Released"],
-               unverified: ["bad", "Blocked"], unverifiable: ["warn", "On hold"], denied: ["bad", "Cancelled"] };
+const CHIP = { idle: ["", "Awaiting your approval"], pending: ["info", "Verifying approver…"], rejected: ["bad", "Rejected"] };
 
 function setStage(state) {
-  const [tone, text] = CHIP[state] || CHIP.idle;
+  const v = VERDICT[state];
+  const [tone, text] = v ? [v.tone, v.chip] : (CHIP[state] || CHIP.idle);
   const chip = $("stateChip");
   chip.className = `chip ${tone}`;
   chip.textContent = text;
-  $("stepApprove").className = { pending: "active", verified: "done", unverified: "failed", denied: "failed", unverifiable: "hold" }[state] || "current";
+  $("stepApprove").className = { pending: "active", verified: "done", unverified: "failed", denied: "failed", unverifiable: "hold", rejected: "failed" }[state] || "current";
+  $("stepApproveSub").textContent = v ? v.step : { pending: "InHuman check in progress", rejected: "Rejected by you" }[state] || "You · live-person check";
   $("stepRelease").className = state === "verified" ? "done" : "";
-  $("stepApproveSub").textContent = { pending: "InHuman check in progress", verified: "Live person confirmed", unverified: "Not a verified live person",
-                                       denied: "Declined on the phone", unverifiable: "Check incomplete" }[state] || "You · live-person check";
+  $("stepReleaseSub").textContent = v ? v.release : "SWIFT · before 17:00 ET";
 }
 
-function show(html) { const s = $("status"); s.style.display = "block"; s.innerHTML = html; }
+function logEntry(tone, title, detailHtml) {
+  const li = document.createElement("li");
+  li.innerHTML = `<time class="num">${clock()}</time><span class="dot ${tone}"></span><div><b>${esc(title)}</b>${detailHtml ? `<div class="d">${detailHtml}</div>` : ""}</div>`;
+  $("log").appendChild(li);
+}
 
-function render(req) {
-  if (req.status === "pending") {
-    const web = req.device === "web";
-    setStage("pending");
-    return show(`<section class="card wait"><div class="spinner"></div><div>
-      <h2>${web ? "Finish the check in the InHuman tab" : "Check your phone"}</h2>
-      <p>${web ? `It opened in a new tab. If it didn't, <a href="${esc(appUrl(req))}" target="_blank" rel="noopener">open it here</a>.`
-               : `Open InHuman on your phone and approve the request from ${esc(APP_NAME)}.`}</p>
-      <ol class="how"><li>Take a selfie</li><li>Lean in while the screen flashes</li><li>The result returns here automatically</li></ol>
-      </div><div class="reqid num">Request <code>${esc(req.id)}</code></div></section>`);
-  }
+// ---------- the InHuman widget ----------
+
+const user = () => (S.user || "daniel").trim() || "daniel";
+function body(html) { $("ihBody").innerHTML = html; }
+
+function renderIdle(note) {
+  S.state = "idle";
+  body(`
+    <div><h3>Prove a live human is approving</h3>
+      <p class="lead" style="margin-top:4px">Take a selfie, then lean in while the screen flashes a random pattern. InHuman reads the light on your skin and the pattern's reflection in your eye. <b>About ten seconds.</b></p></div>
+    ${note ? `<div class="err"><b>${esc(note.title)}</b><span>${esc(note.detail)}</span></div>` : ""}
+    <div><label for="user">Approving as</label><input id="user" value="${esc(user())}" autocomplete="off" spellcheck="false" autocapitalize="off"></div>
+    <div class="btns">
+      <button id="goWeb" class="primary" type="button">${ICON.screen}Verify on this computer</button>
+      <button id="goPhone" class="secondary" type="button">${ICON.phone}Use my phone instead</button>
+    </div>
+    <p class="fine">Sit close, screen brightness all the way up, dim room. The check stops if you leave the tab.</p>
+    <div class="foot">${ICON.lock}<span>Evidence is stored with this approval</span>${INJECT !== null ? `<span class="mode">Test: injected camera</span>` : ""}</div>`);
+  const inp = $("user");
+  inp.addEventListener("input", () => { S.user = inp.value; localStorage.setItem("inhuman.user", user()); });
+  $("goWeb").onclick = () => signIn("web");
+  $("goPhone").onclick = () => signIn("phone");
+}
+
+function renderPending(req) {
+  S.state = "pending";
+  const web = req.device === "web";
+  body(`
+    <div class="waithead"><div class="ring"></div>
+      <div><h3>${web ? "Check in progress" : "Sent to your phone"}</h3>
+        <p class="lead" style="margin-top:2px">${web ? `Finish it in the InHuman tab. If it didn't open, <a href="${esc(appUrl(req))}" target="_blank" rel="noopener">open it here</a>.`
+                                                    : `Open InHuman on your phone and approve the request from ${esc(APP_NAME)}.`}</p></div></div>
+    <div class="scan" aria-hidden="true"></div>
+    <ol class="how">
+      <li><i>1</i><span><b>Selfie</b> <span class="dim">· matched against the enrolled face</span></span></li>
+      <li><i>2</i><span><b>Lean in</b> <span class="dim">· one eye fills the ring; the move is watched</span></span></li>
+      <li><i>3</i><span><b>Flash pattern</b> <span class="dim">· random shapes and colours, about 6 s</span></span></li>
+      <li><i>4</i><span><b>Analysis</b> <span class="dim">· light on the skin, reflection in the cornea</span></span></li>
+    </ol>
+    <div class="kv"><span>request <b>${esc(req.id)}</b></span><span id="elapsed">elapsed <b>0:00</b></span></div>
+    <div class="links"><button id="cancel" class="text" type="button">Cancel</button></div>`);
+  $("cancel").onclick = cancel;
+}
+
+function evidenceRows(tiles) {
+  const rows = (tiles || []).filter((t) => t && t.name).map((t) => `
+    <div class="ev"><i class="${esc(t.status)}"></i><span class="n">${esc(t.name)}</span>
+      <div><div class="h ${t.status === "red" ? "red" : ""}">${esc(t.headline)}</div>${t.detail ? `<div class="d">${esc(t.detail)}</div>` : ""}</div></div>`).join("");
+  return rows ? `<div class="evidence">${rows}</div>` : "";
+}
+
+function renderDone(req) {
+  S.state = "done";
   const r = req.result || {};
-  const ok = r.verdict === "verified";
-  const v = VERDICT[r.verdict] || { title: r.verdict, tone: "bad", outcome: "Transfer held", note: "" };
-  setStage(VERDICT[r.verdict] ? r.verdict : "unverifiable");
+  const v = VERDICT[r.verdict] || VERDICT.unverifiable;
+  let title = v.title;
+  if (r.verdict === "unverified" && /selfie does not match/i.test(r.reason || "")) title = "Not the enrolled approver";
+  const raw = String(r.reason || "").trim();
+  const plain = friendly(raw) || (v.tone === "ok" ? COPY[0][1] : "");
+  const selfie = r.capture ? `<img class="selfie" alt="Selfie from this check" src="/captures/${encodeURIComponent(r.capture)}/selfie.jpg" onerror="this.remove()">` : "";
+  const secs = fin(r.processing_s);
+  body(`
+    <div class="vhead"><div class="vmark ${v.tone}">${ICON[v.tone]}</div>
+      <div><h3 class="${v.tone}">${esc(title)}</h3><p>${esc(plain)}</p></div>${selfie}</div>
+    <div class="kv"><span>${secs != null ? `checked in <b>${secs.toFixed(1)} s</b>` : `request <b>${esc(req.id)}</b>`}</span>${r.capture ? `<span>evidence <b>${esc(r.capture.slice(0, 18))}…</b></span>` : ""}</div>
+    ${evidenceRows(r.tiles)}
+    ${raw && raw !== plain ? `<div class="tech"><b>Detail</b>${esc(raw)}</div>` : ""}
+    <div class="links">
+      ${r.capture ? `<a href="/app/?replay=${encodeURIComponent(r.capture)}" target="_blank" rel="noopener">Open the evidence report &rarr;</a>
+                     <a href="/captures/${encodeURIComponent(r.capture)}/result.json" target="_blank" rel="noopener">JSON</a>` : ""}
+      <button id="again" class="text" type="button">Start over</button>
+    </div>`);
+  $("again").onclick = startOver;
+}
 
-  const img = r.capture ? `<img src="/captures/${esc(r.capture)}/selfie.jpg" alt="" onerror="this.remove()">` : "";
-  const tiles = (r.tiles || []).map(t => `<div class="tile"><div class="name"><span class="dot ${esc(t.status)}"></span>${esc(t.name)}</div>
-    <div class="headline">${esc(t.headline)}</div><div class="detail">${esc(t.detail)}</div></div>`).join("");
+// ---------- the bank's decision ----------
+
+function renderDecision(req) {
+  const r = req.result || {};
+  const v = VERDICT[r.verdict] || VERDICT.unverifiable;
+  const ok = r.verdict === "verified";
+  const box = $("decision");
+  box.className = `card decision ${v.tone}`;
 
   // What face recognition alone would have concluded, next to what InHuman concluded.
-  let compare = "";
-  if (typeof r.face_similarity === "number") {
-    const pass = typeof r.face_pass_mark === "number" ? r.face_pass_mark : 0.35;
-    const facePass = r.face_similarity >= pass;
-    compare = `<div class="compare">
-      <div class="cell ${facePass ? (ok ? "ok" : "bad") : "bad"}"><div class="eyebrow">Face recognition alone</div>
-        <div class="big">${facePass ? (ok ? "Approved" : "Would have released the wire") : "Would have rejected"}</div>
-        <div class="sm num">similarity ${r.face_similarity.toFixed(2)} against a ${pass.toFixed(2)} pass mark</div></div>
-      <div class="vs">VS</div>
-      <div class="cell hi ${v.tone}"><div class="eyebrow">InHuman live-person check</div>
-        <div class="big">${esc(v.outcome)}</div><div class="sm">${esc(r.reason)}</div></div></div>`;
+  let versus = "", strip = "";
+  const sim = fin(r.face_similarity);
+  if (sim != null) {
+    const pass = fin(r.face_pass_mark) ?? PASS_MARK;
+    const facePass = sim >= pass;
+    const pct = (clamp01(sim) * 100).toFixed(1), tick = (pass * 100).toFixed(1);
+    const faceTone = facePass ? (ok ? "ok" : "bad") : "bad";
+    versus = `<div class="versus">
+      <div class="cell ${faceTone}">
+        <div class="eyebrow">Face recognition alone</div>
+        <div class="big num">${fix2(sim)}<small>match to the enrolled face</small></div>
+        <div class="meter"><div class="bar"><i class="fill ${facePass && !ok ? "bad" : ""}" style="width:${pct}%"></i><i class="tick" style="left:${tick}%"></i></div>
+          <div class="scale num"><span>0</span><span class="pass" style="left:${tick}%">${pass.toFixed(2)} pass mark</span><span class="r">1</span></div></div>
+        <div class="say ${faceTone}">${ICON[facePass ? "ok" : "bad"]}${facePass ? `Would approve: releases ${AMOUNT}` : "Would reject: not the enrolled face"}</div>
+      </div>
+      <div class="vs" aria-hidden="true">VS</div>
+      <div class="cell ours ${v.tone}">
+        <div class="eyebrow">InHuman live-person check</div>
+        <div class="big">${esc(v.outcome)}</div>
+        <div class="sm">${esc(v.tone === "ok" ? "A live person, and the enrolled approver." : friendlyShort(r.reason))}</div>
+        <div class="say ${v.tone}">${ICON[v.tone]}${esc(v.tone === "ok" ? "Live human confirmed" : v.tone === "bad" ? `${AMOUNT} stays in the account` : "Nothing moved")}</div>
+      </div></div>`;
+    if (ok && facePass) strip = `<div class="strip ok">${ICON.ok}<span>Both agree: this is the enrolled approver, and they are live.</span></div>`;
+    else if (facePass && v.tone === "bad") strip = `<div class="strip bad">${ICON.warn}<span>Face recognition was fooled at ${fix2(sim)}. InHuman caught it.</span></div>`;
+    else if (facePass) strip = `<div class="strip warn">${ICON.warn}<span>Face recognition would approve. InHuman won't until it sees proof of a live person.</span></div>`;
+    else strip = `<div class="strip flat"><span>Both reject: the selfie doesn't match the enrolled approver.</span></div>`;
   }
-  const meta = [`Request <code>${esc(req.id)}</code>`, r.processing_s ? `Analyzed in ${Number(r.processing_s).toFixed(1)} s` : "",
-                r.capture ? `Evidence <code>${esc(r.capture)}</code>` : ""].filter(Boolean).map(m => `<span class="num">${m}</span>`).join("");
-
-  show(`<section class="card report">
-    <div class="verdict ${v.tone}"><div class="mark">${ICON[v.tone]}</div><div><h2>${esc(v.title)}</h2><p>${esc(r.reason)}</p></div>${img}</div>
-    <div class="outcome"><b>${esc(v.outcome)}</b><span>${esc(v.note)}</span></div>
-    ${compare}${tiles ? `<div class="tiles">${tiles}</div>` : ""}
-    <div class="meta">${meta}</div></section>`);
-  $("status").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  box.innerHTML = `<div class="top"><div class="glyph">${ICON[v.tone]}</div><div><h2>${esc(v.outcome)}</h2><p>${esc(v.note)}</p></div></div>${versus}${strip}`;
+  box.hidden = false;
 }
 
-const buttons = [$("goWeb"), $("goPhone")];
+// ---------- the loop: create a request, open the check, poll for the verdict ----------
+
+function stopWatching() { clearInterval(S.poll); clearInterval(S.clock); S.poll = S.clock = null; }
 
 async function signIn(device) {
-  clearInterval(timer);
-  buttons.forEach(b => b.disabled = true);
+  if (S.busy) return;
+  S.busy = true;
   // Open the tab inside the click, before any await, or the pop-up blocker eats it.
   const tab = device === "web" ? window.open("about:blank", "inhuman") : null;
-  const res = await fetch("/auth/requests", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user: $("user").value.trim(), app_name: APP_NAME, device }) });
-  if (!res.ok) {
+  const u = user();
+  try {
+    const enrolled = (await api(`/users/${encodeURIComponent(u)}`)).enrolled;
+    if (!enrolled) {
+      if (tab) tab.location = `/app/?user=${encodeURIComponent(u)}`;
+      renderIdle({ title: `“${u}” hasn't enrolled with InHuman yet`, detail: `Enroll a face once in the InHuman app${tab ? " (it just opened in a new tab)" : ""}, then come back and verify.` });
+      return;
+    }
+    const req = await api("/auth/requests", { method: "POST", headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ user: u, app_name: APP_NAME, device }) });
+    if (tab) tab.location = appUrl(req);
+    watch(req);
+  } catch (e) {
     if (tab) tab.close();
-    setStage("idle");
-    show(`<section class="card error"><h2>Couldn't start the check</h2><p>${esc(await res.text())}</p></section>`);
-    buttons.forEach(b => b.disabled = false);
-    return;
-  }
-  let req = await res.json();
-  if (tab) tab.location = appUrl(req);
-  render(req);
-  timer = setInterval(async () => {
-    req = await (await fetch(`/auth/requests/${req.id}`)).json();
-    render(req);
-    if (req.status !== "pending") { clearInterval(timer); buttons.forEach(b => b.disabled = false); }
+    renderIdle({ title: "Couldn't start the check", detail: `${e.message}. Is the InHuman server running?` });
+  } finally { S.busy = false; }
+}
+
+function watch(req) {
+  stopWatching();
+  S.req = req;
+  S.startedAt = Date.now();
+  setStage("pending");
+  $("decision").hidden = true;
+  logEntry("info", "Step-up verification requested", `InHuman · request <code>${esc(req.id)}</code> · ${req.device === "web" ? "this computer's camera" : "phone"}`);
+  renderPending(req);
+  S.clock = setInterval(() => {
+    const s = Math.floor((Date.now() - S.startedAt) / 1000), el = $("elapsed");
+    if (el) el.innerHTML = `elapsed <b>${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}</b>`;
+  }, 1000);
+  let misses = 0;
+  S.poll = setInterval(async () => {
+    try {
+      const r = await api(`/auth/requests/${encodeURIComponent(req.id)}`);
+      misses = 0;
+      if (r.status !== "pending") { stopWatching(); finish(r); }
+    } catch (e) {
+      if (++misses === 8) logEntry("warn", "Lost contact with the InHuman server", "Still trying…");
+    }
   }, 1000);
 }
 
-$("goWeb").onclick = () => signIn("web");
-$("goPhone").onclick = () => signIn("phone");
-
-// ?replay=<capture folder>: show a saved check's outcome without running one (same as the InHuman app's ?replay).
-async function replay(name) {
-  const r = await (await fetch(`/captures/${encodeURIComponent(name)}/result.json`)).json();
-  const sim = ((r.signals || {}).identity || {}).similarity;
-  render({ id: "replay", user: $("user").value, device: "web", status: "done",
-           result: { verdict: r.verdict, reason: r.reason, tiles: r.tiles, capture: r.capture || name, processing_s: r.processing_s,
-                     face_similarity: typeof sim === "number" ? sim : null, face_pass_mark: 0.35 } });
+function finish(req) {
+  S.req = req;
+  const r = req.result || {};
+  const state = VERDICT[r.verdict] ? r.verdict : "unverifiable";
+  const v = VERDICT[state];
+  setStage(state);
+  renderDone(req);
+  renderDecision(req);
+  const sim = fin(r.face_similarity);
+  logEntry(v.tone, `InHuman verdict: ${v.title.toLowerCase()}`,
+    `${esc(friendlyShort(r.reason) || "")}${sim != null ? ` · face match ${fix2(sim)}` : ""}${r.capture ? ` · evidence <code>${esc(r.capture)}</code>` : ""}`);
+  logEntry(v.tone, v.outcome, esc(v.tone === "ok" ? "Queued for SWIFT release" : v.tone === "bad" ? "Security notified; funds held" : "Nothing approved; try again"));
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
-if (PARAMS.get("replay")) replay(PARAMS.get("replay")).catch(e => show(`<section class="card error"><h2>Replay failed</h2><p>${esc(e.message)}</p></section>`));
+
+function cancel() {
+  const id = S.req && S.req.id;
+  stopWatching();
+  logEntry("warn", "Verification cancelled", "By the approver, from this page");
+  setStage("idle");
+  renderIdle();
+  if (id) api(`/auth/requests/${encodeURIComponent(id)}/deny`, { method: "POST" }).catch(() => {});
+}
+
+function startOver() {
+  stopWatching();
+  S.req = null;
+  $("decision").hidden = true;
+  setStage("idle");
+  renderIdle();
+}
+
+$("reject").onclick = () => {
+  stopWatching();
+  setStage("rejected");
+  const box = $("decision");
+  box.className = "card decision bad";
+  box.innerHTML = `<div class="top"><div class="glyph">${ICON.bad}</div><div><h2>Wire rejected</h2><p>Rejected by the approver without verification. Finance operations has been notified and nothing has moved.</p></div></div>`;
+  box.hidden = false;
+  logEntry("bad", "Wire rejected", "By the approver · no funds moved");
+  body(`<div><h3>Nothing to verify</h3><p class="lead" style="margin-top:4px">You rejected this wire. No live-person check was run.</p></div>
+        <div class="links"><button id="again" class="text" type="button" style="margin-left:0">Start over</button></div>`);
+  $("again").onclick = startOver;
+};
+
+// ---------- replays and resumes ----------
+
+/** ?replay=<capture folder>: show a saved check's outcome without running one (same as the InHuman app's ?replay). */
+async function replay(name) {
+  const r = await api(`/captures/${encodeURIComponent(name)}/result.json`);
+  const sim = ((r.signals || {}).identity || {}).similarity;
+  stopWatching();
+  finish({ id: `replay-${name.slice(0, 11)}`, user: user(), device: "web", status: "done",
+           result: { verdict: r.verdict, reason: r.reason, tiles: r.tiles, capture: r.capture || name, processing_s: r.processing_s,
+                     face_similarity: typeof sim === "number" ? sim : null, face_pass_mark: PASS_MARK } });
+}
+
+/** The footer's demo control: every saved check on the server, newest first. A backup if the camera fails on stage. */
+async function loadCaptures() {
+  const sel = $("replaySel");
+  try {
+    const rows = await api("/captures");
+    const opts = rows.filter((c) => c.verdict).map((c) => {
+      const sim = fin(c.face_similarity);
+      return `<option value="${esc(c.name)}">${esc(c.label || "run")} · ${esc(c.verdict)}${sim != null ? ` · face ${fix2(sim)}` : ""} · ${esc(c.name.slice(0, 11))}</option>`;
+    });
+    sel.innerHTML = `<option value="">Choose a saved check…</option>${opts.join("")}`;
+  } catch { sel.innerHTML = `<option value="">Server not reachable</option>`; }
+  sel.onchange = () => { if (sel.value) replay(sel.value).catch((e) => renderIdle({ title: "Replay failed", detail: e.message })); };
+}
+
+/** ?request=<id>: keep watching a request this page created earlier (a reload mid-check). */
+async function resume(id) {
+  const req = await api(`/auth/requests/${encodeURIComponent(id)}`);
+  if (req.status === "pending") watch(req); else finish(req);
+}
+
+setStage("idle");
+renderIdle();
+loadCaptures();
+if (PARAMS.get("replay")) replay(PARAMS.get("replay")).catch((e) => renderIdle({ title: "Replay failed", detail: e.message }));
+else if (PARAMS.get("request")) resume(PARAMS.get("request")).catch((e) => renderIdle({ title: "Couldn't resume that request", detail: e.message }));
 </script>
 </body>
 </html>

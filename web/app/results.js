@@ -1,530 +1,579 @@
-// Results screen (plain script, not a module). app.js calls renderResults(r) with the /verify response.
-// Reads the globals $, show and reset from app.js (loaded first). Exposes renderResults and lineChart.
-// Everything else lives inside this closure so it can never collide with app.js's top-level names.
+// Results screen (plain script, not a module). app.js calls renderResults(r) with the /verify JSON.
+// Uses two globals from app.js: $ (getElementById) and show(name). Everything else lives in this
+// closure so no top-level name can collide with app.js.
 //
-// The four elements index.html puts inside .resultsWrap (#verdict, #tiles, #timing, #btnDone) are
-// kept and reused, so app.js's bindings on them (Done -> reset) survive every render.
+// Layout built inside #results .resultsWrap (index.html owns the markup, this file fills it):
+//   #verdict   hero: drawn check/cross, verdict, plain-English reason, "Analyzed in X s" (#timing moves here)
+//   .compare   "face recognition alone" vs "InHuman" strip (created here, before #tiles)
+//   #tiles     one evidence card per r.tiles entry, enriched by name from r.signals
+//   #btnDone   kept last; app.js owns its click handler
 (function () {
   "use strict";
 
-  const PASS_MARK = 0.35;                                  // server: THRESHOLDS.face_similarity_min
-  const SENT_RGB = { red: "rgb(255,80,40)", green: "rgb(0,255,0)" };   // server: challenge.COLORS
-  const TRACE = ["#ff6a45", "#4ade80"];                    // chart colours for the red and green channels
-  const MONO = 'ui-monospace, "SF Mono", Menlo, monospace';
+  const PASS_MARK = 0.35;                                   // server THRESHOLDS: face similarity pass mark
+  const FLASH = { red: "rgb(255,80,40)", green: "rgb(0,255,0)" };   // server challenge.COLORS: what the screen showed
+  const SHAPE_SPAN = 0.75;                                  // web client: shape spans 75% of the screen height
+  const TITLE = { verified: "Verified", unverified: "Not verified", unverifiable: "Couldn't verify" };
+  const TONE = { verified: "ok", unverified: "bad", unverifiable: "warn" };
+  const FALLBACK_REASON = { verified: "Live human, matching the enrolled face.", unverified: "This check did not pass.", unverifiable: "The check couldn't be completed." };
   const STATUS = { green: "ok", yellow: "warn", red: "bad" };
-  const SHOWN_ELSEWHERE = ["Light response", "Eye reflection", "Face match"];
+  const STATUS_WORD = { ok: "Pass", warn: "Inconclusive", bad: "Fail" };
+  const WIDE = new Set(["Light response", "Eye reflection"]);
 
+  // What each check looks at, and why a face swap fails it.
+  const EXPLAIN = {
+    "Light response": "Skin lights up the instant the screen does. A deepfake has to see the flash, redraw the face and send it, so it arrives late.",
+    "Eye reflection": "Your eye is a tiny curved mirror. We flashed a random pattern and read it back off your cornea. A face swap redraws the eye and loses it.",
+    "Face match": "The selfie against the face enrolled for this account. This is the one check a face swap is built to pass, which is why it is never enough on its own.",
+    "Continuity": "The same face has to stay on camera from the selfie all the way in to the eye check. A swap that holds at arm's length falls apart when the eye fills the frame.",
+    "Vibration": "The phone buzzes at random moments and the camera has to see the shake the motion sensor felt. A video fed into the phone never shakes.",
+    "Heartbeat": "Skin colour pulses faintly with every heartbeat. Weak evidence on its own, so it never decides a check.",
+  };
+
+  // 24x24 outline icons, stroke 1.75 (set in CSS).
+  const ICON = {
+    check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+    cross: '<path d="M6 6l12 12M18 6L6 18"/>',
+    question: '<path d="M9.3 9.3a2.8 2.8 0 1 1 4 2.6c-.9.5-1.3 1.1-1.3 2v.4"/><path d="M12 17.6h.01"/>',
+    "Light response": '<circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+    "Eye reflection": '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    "Face match": '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c0-3.9 3.4-6.5 7.5-6.5s7.5 2.6 7.5 6.5"/>',
+    "Continuity": '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+    "Vibration": '<rect x="8" y="3.5" width="8" height="17" rx="2"/><path d="M4.5 8.5v7M19.5 8.5v7M1.5 10.5v3M22.5 10.5v3"/>',
+    "Heartbeat": '<path d="M12 20s-7.5-4.6-7.5-10A4 4 0 0 1 12 8a4 4 0 0 1 7.5 2c0 5.4-7.5 10-7.5 10z"/>',
+    generic: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/>',
+    arrow: '<path d="M4 12h15M13.5 6.5L19 12l-5.5 5.5"/>',
+  };
+
+  // ---------- small helpers ----------
   const byId = (id) => document.getElementById(id);
   const fin = (v) => (typeof v === "number" && isFinite(v) ? v : null);
   const clamp01 = (v) => Math.min(1, Math.max(0, v));
-  const reducedMotion = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
-  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const fix2 = (v) => (Math.abs(v) < 0.005 ? "0.00" : v.toFixed(2));
+  const fix2 = (v) => (Math.abs(v) < 0.005 ? "0.00" : v.toFixed(2));       // no "-0.00"
+  const lower = (s) => String(s || "").trim().replace(/^[A-Z]/, (c) => c.toLowerCase());
   const sentence = (s) => { s = String(s || "").trim(); return s ? s[0].toUpperCase() + s.slice(1) + (/[.!?]$/.test(s) ? "" : ".") : ""; };
+  const reducedMotion = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const cssVar = (name, el) => getComputedStyle(el || document.documentElement).getPropertyValue(name).trim();
 
-  // ---------- copy: server reason -> plain English ----------
-  // [substring of the server's reason, full sentence, short label]. First match wins, so the more
-  // specific keys come first.
-  const COPY = [
-    ["live human, matching", "A live person, and the same person who enrolled.", "Live, and the enrolled person"],
-    ["flat screen or print", "The reflection is far too large for a human eye. This is a flat screen or a print.", "Reflection too large for an eye"],
-    ["reflection is far too large", "The reflection is far too large for a human eye. This is a flat screen or a print.", "Reflection too large for an eye"],
-    ["not inside an iris", "The reflection isn't inside an iris, so it isn't coming from an eye.", "Reflection isn't inside an iris"],
-    ["no iris around it", "Something reflected the screen, but there was no iris around it. On a real eye the reflection sits inside the iris.", "No iris around the reflection"],
-    ["missing in too many flashes", "The reflection in the eye went missing during too many flashes. Keep the eye open and still.", "Reflection missing in too many flashes"],
-    ["too few usable states", "Too few flashes could be read from the eye.", "Too few flashes could be read"],
-    ["no eye reflection found", "No reflection of the screen was found in the eye. A real cornea mirrors the screen in front of it; a generated face doesn't.", "No reflection found in the eye"],
-    ["eye reflection does not match", "The reflection in the eye didn't move with the shapes on screen.", "Reflection didn't follow the screen"],
-    ["no light response", "The face didn't change colour with the screen's flashes, so this video isn't of someone sitting in front of this screen.", "Skin didn't follow the screen's light"],
-    ["response delayed", "The face reacted to the flashes too late. That delay is the time a computer needs to draw a fake face.", "Skin reacted too late"],
-    ["delayed by", "The face reacted to the flashes too late. That delay is the time a computer needs to draw a fake face.", "Skin reacted too late"],
-    ["not the person in the selfie", "The face that took the selfie isn't the face that did the eye check.", "Different face in the eye check"],
-    ["a different face appeared", "A different face appeared between the selfie and the eye check.", "A different face appeared"],
-    ["camera view jumped", "The camera view jumped between the selfie and the eye check, so it wasn't one continuous move.", "Camera view jumped"],
-    ["frames are missing", "The camera feed was interrupted between the selfie and the eye check, so it wasn't one continuous sitting.", "Camera feed was interrupted"],
-    ["camera was interrupted", "The app was left, or the camera was interrupted, between the selfie and the eye check.", "The sitting was interrupted"],
-    ["too long between", "Too much time passed between the selfie and the eye check.", "Too long after the selfie"],
-    ["selfie does not match", "The selfie doesn't match the enrolled face.", "Selfie doesn't match the enrolled face"],
-    ["no selfie uploaded", "No selfie came with this check, so there was no face to compare with the enrolled one.", "No selfie to compare"],
-    ["no face found in the selfie", "No face was found in the selfie.", "No face in the selfie"],
-    ["not enrolled", "This user hasn't enrolled a face yet.", "User isn't enrolled"],
-    ["ambient light", "The room is too bright for the screen's light to show on the face. Try somewhere dimmer.", "Room too bright"],
-    ["too few frames", "The camera didn't deliver enough frames during the flashes.", "Too few camera frames"],
-    ["dropped camera frames", "Too many camera frames were dropped during the check.", "Too many dropped frames"],
-    ["no eye was found", "No eye was found, so the selfie couldn't be compared with the eye check.", "No eye to compare with the selfie"],
-    ["no face was visible right after", "No face was visible right after the selfie, so the move to the eye couldn't be followed.", "Move to the eye wasn't visible"],
-    ["too fast to follow", "The move to the eye was too fast to follow. Bring the camera in steadily.", "Move to the eye was too fast"],
-    ["was not recorded", "The move from the selfie to the eye wasn't recorded.", "Move to the eye wasn't recorded"],
-    ["could not be measured", "The face's response to the screen's light couldn't be measured.", "Light response not measured"],
-    ["no motion sensor", "The phone didn't record any motion sensor data.", "No motion sensor data"],
-    ["denied", "The sign-in request was denied.", "Request denied"],
-  ];
-  function lookup(reason) {
-    const s = String(reason || "").toLowerCase();
-    for (const row of COPY) if (s.includes(row[0])) return row;
-    return null;
+  /** h("div", "cls", child, "text", ...) */
+  function h(tag, cls, ...kids) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    for (const k of kids) if (k != null && k !== false) e.append(k.nodeType ? k : document.createTextNode(String(k)));
+    return e;
   }
-  const friendly = (reason) => { const row = lookup(reason); return row ? row[1] : sentence(reason); };
-  const friendlyShort = (reason) => { const row = lookup(reason); return row ? row[2] : sentence(reason).replace(/\.$/, ""); };
+  function svg(inner, viewBox = "0 0 24 24", cls = "") {
+    const t = document.createElement("template");
+    t.innerHTML = `<svg class="${cls}" viewBox="${viewBox}" aria-hidden="true" focusable="false">${inner}</svg>`;
+    return t.content.firstElementChild;
+  }
+  const icon = (name, cls = "ico") => svg(ICON[name] || ICON.generic, "0 0 24 24", cls);
 
-  const TILE_BLURB = {
-    "Continuity": "The selfie and the eye check have to be the same person, in one uninterrupted sitting.",
-    "Heartbeat": "A pulse read from tiny colour changes in the skin. Supporting evidence only.",
-    "Vibration": "The phone buzzes during the check. A real camera shakes with it; an injected video doesn't.",
-  };
-
-  // ---------- small SVG pieces ----------
-
-  const ICON = {
-    ok: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5 6.5 11.5 12.5 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    bad: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2 11.8 11.8M11.8 4.2 4.2 11.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
-    warn: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.6v5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="11.9" r="1.15" fill="currentColor"/></svg>',
-  };
-
-  /** The big animated verdict mark: a gauge ring that draws itself, then the glyph. */
-  function markSvg(kind) {
-    const glyph = {
-      ok: '<path class="mk-glyph" pathLength="100" d="M31 49.5 43 61.5 66 36"/>',
-      bad: '<path class="mk-glyph" pathLength="100" d="M35.5 35.5 60.5 60.5"/><path class="mk-glyph mk-late" pathLength="100" d="M60.5 35.5 35.5 60.5"/>',
-      warn: '<path class="mk-glyph" pathLength="100" d="M38.5 39.5a9.5 9.5 0 1 1 14.6 8c-3.4 2.2-5.1 4.2-5.1 8.5"/><circle class="mk-dot" cx="48" cy="66" r="2.9"/>',
-    }[kind];
-    return `<svg class="mark" viewBox="0 0 96 96" aria-hidden="true">
-      <circle class="mk-ticks" cx="48" cy="48" r="45.5"/>
-      <circle class="mk-disc" cx="48" cy="48" r="39"/>
-      <circle class="mk-ring" pathLength="100" cx="48" cy="48" r="39" transform="rotate(-90 48 48)"/>
-      ${glyph}</svg>`;
+  /** Big number with a small mono unit after it. */
+  function figure(value, unit, cls = "headline num") {
+    const e = h("div", cls, value);
+    if (unit) e.append(h("small", "", unit));
+    return e;
   }
 
-  /** A tiny picture of the screen during one flash: the sent shape, in the sent colour, where it was shown. */
-  function screenGlyph(shape, color, position, axis) {
-    const fill = SENT_RGB[color] || "#8b96a8";
-    const slot = { top: 0, middle: 1, bottom: 2 }[position];
-    const wide = axis === "x";
-    const W = wide ? 40 : 22, H = wide ? 24 : 38, s = 5.2;
-    const cx = wide ? (slot == null ? W / 2 : 9 + slot * 11) : W / 2;
-    const cy = wide ? H / 2 : (slot == null ? H / 2 : 9 + slot * 10);
-    let mark;
-    if (shape === "circle") mark = `<circle cx="${cx}" cy="${cy}" r="${s}" fill="${fill}"/>`;
-    else if (shape === "square") mark = `<rect x="${cx - s}" y="${cy - s}" width="${2 * s}" height="${2 * s}" rx=".6" fill="${fill}"/>`;
-    else if (shape === "triangle") mark = `<polygon points="${cx},${cy - s} ${cx - s * 1.1},${cy + s * 0.85} ${cx + s * 1.1},${cy + s * 0.85}" fill="${fill}"/>`;
-    else mark = `<circle cx="${cx}" cy="${cy}" r="2" fill="${fill}"/>`;
-    return `<svg class="screenGlyph" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
-      <rect x=".5" y=".5" width="${W - 1}" height="${H - 1}" rx="3.5" fill="#05070a" stroke="#2c3544"/>${mark}</svg>`;
+  // ---------- things that must stop when a new result renders ----------
+  const live = { timers: [], rafs: [], observers: [] };
+  function stopAll() {
+    live.timers.forEach(clearTimeout); live.rafs.forEach(cancelAnimationFrame); live.observers.forEach((o) => o.disconnect());
+    live.timers = []; live.rafs = []; live.observers = [];
+  }
+  const later = (fn, ms) => { const id = setTimeout(fn, ms); live.timers.push(id); return id; };
+  const frame = (fn) => { const id = requestAnimationFrame(fn); live.rafs.push(id); return id; };
+
+  // ---------- 1. verdict hero ----------
+  function buildHero(v, r, verdict, tone, tiles) {
+    v.className = `verdict hero in tone-${tone} ${verdict}`;
+    v.style.setProperty("--d", "0ms");
+    v.innerHTML = "";
+    const mark = { ok: "check", bad: "cross", warn: "question" }[tone];
+    const badge = svg(
+      `<circle class="badgeRing" cx="24" cy="24" r="22.5" pathLength="100"/><g class="badgeMark">${ICON[mark]}</g>`,
+      "0 0 48 48", "badge");
+    // the mark is drawn in 24-unit space; centre it in the 48-unit badge
+    badge.querySelector(".badgeMark").setAttribute("transform", "translate(12 12)");
+    v.append(
+      h("div", "badgeWrap", badge),
+      h("div", "label heroKicker", "InHuman · liveness check"),
+      h("h2", "heroTitle", TITLE[verdict]),
+      h("p", "heroReason", sentence(r.reason) || FALLBACK_REASON[verdict]),
+    );
+    const timing = byId("timing") || h("p", "", "");
+    timing.id = "timing";
+    timing.className = "heroMeta";
+    const secs = fin(r.processing_s);
+    const parts = [];
+    if (secs != null) parts.push(`Analyzed in ${secs.toFixed(1)} s`);
+    if (tiles.length) parts.push(`${tiles.length} checks`);
+    timing.textContent = parts.join("  ·  ");
+    timing.hidden = !parts.length;
+    v.append(timing);
   }
 
-  function sparkline(values) {
-    const v = (values || []).filter((q) => fin(q) != null);
-    if (v.length < 8) return "";
-    const step = Math.max(1, Math.floor(v.length / 90)), pts = [];
-    let lo = Infinity, hi = -Infinity;
-    for (const q of v) { if (q < lo) lo = q; if (q > hi) hi = q; }
-    for (let i = 0; i < v.length; i += step) {
-      pts.push(`${((i / (v.length - 1)) * 120).toFixed(1)},${(25 - ((v[i] - lo) / (hi - lo || 1)) * 22).toFixed(1)}`);
+  // ---------- 2. face recognition alone vs InHuman ----------
+  function gauge(value, tone) {
+    const g = h("div", "gauge");
+    const fill = h("div", `fill t-${tone}`);
+    fill.style.width = value == null ? "0%" : `${(clamp01(value) * 100).toFixed(1)}%`;
+    const tick = h("div", "tick");
+    tick.style.left = `${PASS_MARK * 100}%`;
+    tick.append(h("span", "", `pass mark ${PASS_MARK}`));
+    g.append(h("div", "track", fill), tick);
+    return g;
+  }
+
+  function buildCompare(strip, r, verdict, tone, tiles, sig) {
+    const sim = fin(sig.identity && sig.identity.similarity);
+    const faceTile = tiles.find((t) => t.name === "Face match");
+    const facePass = sim != null ? sim >= PASS_MARK : faceTile ? (faceTile.status === "green" ? true : faceTile.status === "red" ? false : null) : null;
+    const failed = tiles.filter((t) => t.status === "red").map((t) => lower(t.name));
+    const unsure = tiles.filter((t) => t.status === "yellow").map((t) => lower(t.name));
+    const passed = tiles.filter((t) => t.status === "green").length;
+    const simText = sim != null ? fix2(sim) : "—";
+
+    let mode = "unknown";
+    if (facePass === true) mode = verdict === "verified" ? "agree-pass" : "fooled";
+    else if (facePass === false) mode = "agree-fail";
+    strip.className = "compare in";
+    strip.dataset.mode = mode;
+    strip.style.setProperty("--d", "120ms");
+    strip.innerHTML = "";
+
+    // left: what face recognition alone would have done
+    const left = h("div", "cell face");
+    let leftTag, leftLine;
+    if (mode === "fooled") { leftTag = ["bad", "Fooled"]; leftLine = "Match · would have let them in"; }
+    else if (mode === "agree-pass") { leftTag = ["ok", "Match"]; leftLine = "Would have let them in"; }
+    else if (mode === "agree-fail") { leftTag = ["bad", "No match"]; leftLine = "Would have rejected"; }
+    else { leftTag = ["warn", "No score"]; leftLine = sentence(faceTile && faceTile.detail) || "Nothing to compare"; }
+    left.append(
+      h("div", "label", "Face recognition alone"),
+      figure(simText, sim != null ? "similarity" : "", "big num"),
+      gauge(sim, facePass === false ? "bad" : mode === "fooled" ? "bad" : "ok"),
+      h("div", "line", h("span", `tag t-${leftTag[0]}`, leftTag[1]), h("span", "lineText", leftLine)),
+    );
+
+    // right: InHuman
+    const right = h("div", "cell inhuman");
+    let rightTag;
+    if (verdict === "verified") rightTag = ["ok", "Live human"];
+    else if (verdict === "unverified") rightTag = ["ok", mode === "fooled" ? "Caught it" : "Rejected"];
+    else rightTag = ["warn", "Held back"];
+    if (verdict === "unverified" && mode !== "fooled") rightTag = ["bad", "Rejected"];
+    const cap = (s) => s.replace(/^[a-z]/, (c) => c.toUpperCase());
+    let rightLine;
+    if (verdict === "verified") rightLine = unsure.length ? `${passed} checks passed, ${unsure.join(" and ")} inconclusive` : `All ${passed} checks passed`;
+    else if (verdict === "unverified") rightLine = failed.length ? `${mode === "fooled" ? "Caught by" : "Rejected on"} ${failed.join(" and ")}` : sentence(r.reason);
+    else rightLine = unsure.length ? cap(`${unsure.join(" and ")} couldn't be checked`) : sentence(r.reason);
+    right.append(
+      h("div", "label", "InHuman"),
+      h("div", `big verdictWord t-${tone}`, TITLE[verdict]),
+      h("div", "checkRow", ...tiles.map((t) => { const s = STATUS[t.status] || "warn"; const c = h("span", `chip t-${s}`, h("i", "dot"), t.name); c.title = `${t.name}: ${STATUS_WORD[s]}`; return c; })),
+      h("div", "line", h("span", `tag t-${rightTag[0]}`, rightTag[1]), h("span", "lineText", rightLine)),
+    );
+
+    // one sentence that says what just happened
+    let note;
+    if (mode === "fooled") note = `Face recognition scored this face ${simText} against a ${PASS_MARK} pass mark and would have let them in. InHuman ${verdict === "unverified" ? "rejected it" : "held it back"}: ${lower(sentence(r.reason)) || "a liveness check did not pass."}`;
+    else if (mode === "agree-pass") note = `Both agree. The selfie matches the enrolled face (${simText} against a ${PASS_MARK} pass mark) and ${unsure.length ? "no liveness check failed" : "every liveness check passed"}.`;
+    else if (mode === "agree-fail") note = `Face recognition would have rejected this too: ${simText} against a ${PASS_MARK} pass mark.`;
+    else note = `Face recognition had nothing to score${faceTile && faceTile.detail ? ` (${lower(faceTile.detail)})` : ""}, so only the liveness checks count here.`;
+
+    strip.append(
+      h("div", "label compareKicker", mode === "fooled" ? "Same video, two answers" : mode === "unknown" ? "One video, two ways to decide" : "Two ways to decide, same answer"),
+      left,
+      h("div", "vs", h("span", "", mode === "agree-pass" || mode === "agree-fail" ? "=" : "vs")),
+      right,
+      h("p", "compareNote", note),
+    );
+  }
+
+  // ---------- 3. evidence cards ----------
+  function buildCard(t, i, r, sig) {
+    const status = STATUS[t.status] || "warn";
+    const card = h("article", `ev tile in s-${status}${WIDE.has(t.name) ? " wide" : ""}`);
+    card.dataset.name = t.name;
+    card.style.setProperty("--d", `${240 + i * 70}ms`);
+    card.append(
+      h("header", "evHead", icon(t.name), h("span", "label evName name", t.name),
+        h("span", `state t-${status}`, h("i", "dot"), STATUS_WORD[status])),
+      figure(t.headline || "—", ""),
+      h("p", "why", EXPLAIN[t.name] || ""),
+    );
+    try {
+      const enrich = ENRICH[t.name];
+      if (enrich) enrich(card, t, r, sig);
+    } catch (e) {
+      console.warn("results: could not enrich", t.name, e);
     }
-    return `<svg class="spark" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.join(" ")}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+    // the server's terse numbers, unless a plain-English line above already says the same thing
+    if (t.detail && !card.noReadout) card.append(h("p", "readout", t.detail));
+    return card;
   }
 
-  // ---------- the chart ----------
+  const ENRICH = {
+    "Light response": (card, t, r, sig) => {
+      const lag = sig.lag;
+      if (lag && lag.ok !== false && fin(lag.lag_ms) != null && t.status !== "red") {
+        card.querySelector(".headline").replaceWith(figure(String(Math.round(lag.lag_ms)), "ms lag"));
+      } else if (lag && lag.ok === false && lag.reason) {
+        card.append(h("p", "reasonLine", sentence(lag.reason)));
+      }
+      const plot = lag && lag.plot;
+      if (!plot || !Array.isArray(plot.t) || !Array.isArray(plot.expected) || !Array.isArray(plot.measured) || plot.t.length < 2) return;
+      const box = h("div", "chartBox");
+      const canvas = h("canvas", "lagChart");
+      box.append(canvas, h("div", "legend",
+        h("span", "", h("i", "sw solid"), "skin, measured"),
+        h("span", "", h("i", "sw dashed"), "screen, expected")));
+      card.append(box);
+      pending.push(() => animateChart(canvas, plot, card));
+    },
 
-  /**
-   * Draws series onto a canvas, clipped to the first `progress` (0..1) of the time axis.
-   * series: [{ x[], y[], color, lo?, hi?, dash?, width?, alpha?, lane?, label?, glow?, head? }]
-   * Series with different `lane` numbers are stacked like oscilloscope channels.
-   */
-  function lineChart(canvas, series, progress) {
-    if (!canvas || !Array.isArray(series) || !series.length) return;
-    const p = progress == null ? 1 : clamp01(progress);
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth || 320, h = canvas.clientHeight || 120;
-    const W = Math.round(w * dpr), H = Math.round(h * dpr);
-    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+    "Eye reflection": (card, t, r, sig) => {
+      const c = sig.cornea || {};
+      const states = Array.isArray(c.states) ? c.states.filter((s) => s && typeof s === "object") : [];
+      if (!states.length) {
+        const why = t.detail && t.detail.length >= String(c.reason || "").length ? t.detail : c.reason;
+        card.append(h("p", "reasonLine", sentence(why) || "No eye reflection to replay."));
+        card.noReadout = true;
+        return;
+      }
+      const matched = states.filter(isMatch).length;
+      card.querySelector(".headline").replaceWith(figure(`${matched} / ${states.length}`, "flashes read back from the eye"));
+      card.append(buildReplay(states, c.position_axis === "x", t.status === "red"));
+    },
+
+    "Face match": (card, t, r, sig) => {
+      const sim = fin(sig.identity && sig.identity.similarity);
+      if (sim != null) {
+        card.querySelector(".headline").replaceWith(figure(fix2(sim), `similarity · pass mark ${PASS_MARK}`));
+        card.noReadout = /^needs\b/i.test(t.detail || "");        // "needs 0.35" is already in the headline
+      }
+      const row = h("div", "faceRow");
+      if (r.capture) {
+        const img = h("img", "selfieThumb");
+        img.alt = "";
+        img.src = `/captures/${encodeURIComponent(r.capture)}/selfie.jpg`;
+        img.onerror = () => img.remove();
+        row.append(img);
+      }
+      row.append(h("div", "faceGauge", gauge(sim, sim == null ? "warn" : sim >= PASS_MARK ? "ok" : "bad")));
+      card.append(row);
+    },
+
+    "Continuity": (card, t, r, sig) => {
+      const c = sig.continuity, tr = sig.transit;
+      const chips = [];
+      if (c && c.ok !== false && fin(c.similarity) != null) chips.push([`${c.similarity.toFixed(2)}`, "selfie vs eye check"]);
+      if (tr && tr.ok !== false) {
+        if (fin(tr.duration_s) != null) chips.push([`${tr.duration_s.toFixed(1)} s`, "watched, selfie to eye"]);
+        if (fin(tr.cuts) != null) chips.push([String(tr.cuts), tr.cuts === 1 ? "cut in the feed" : "cuts in the feed"]);
+        if (typeof tr.identity_held === "boolean" && !tr.identity_held) chips.push(["lost", "identity on the way in"]);
+      }
+      if (chips.length) card.append(h("div", "stats", ...chips.map(([v, l]) => h("div", "stat", h("div", "statV num", v), h("div", "statL", l)))));
+      if (c && c.ok === false && (c.reason || t.detail)) {
+        const why = t.detail && t.detail.length >= String(c.reason || "").length ? t.detail : c.reason;
+        card.append(h("p", "reasonLine", sentence(why)));
+        card.noReadout = true;
+      }
+    },
+
+    "Vibration": (card, t, r, sig) => {
+      const v = sig.vibration;
+      if (!v) return;
+      if (v.ok === false && v.reason) { card.append(h("p", "reasonLine", sentence(v.reason))); return; }
+      const chips = [];
+      if (fin(v.imu_detected) != null && fin(v.n_bursts) != null) chips.push([`${v.imu_detected} / ${v.n_bursts}`, "bursts the sensor felt"]);
+      if (fin(v.video_detected) != null && fin(v.n_bursts) != null) chips.push([`${v.video_detected} / ${v.n_bursts}`, "bursts the camera saw"]);
+      if (fin(v.motion_corr) != null) chips.push([v.motion_corr.toFixed(2), "video-gyro agreement"]);
+      if (chips.length) card.append(h("div", "stats", ...chips.map(([val, l]) => h("div", "stat", h("div", "statV num", val), h("div", "statL", l)))));
+    },
+  };
+
+  // ---------- eye reflection replay ----------
+  const isMatch = (s) => (typeof s.match === "boolean" ? s.match : !!s.decoded_shape && s.decoded_shape === s.sent_shape);
+  const SHAPES = new Set(["circle", "square", "triangle"]);
+  const POS = { top: 0.25, middle: 0.5, bottom: 0.75 };
+  const POS_NAME_X = { top: "left", middle: "middle", bottom: "right" };
+
+  /** A tiny rendering of what the screen displayed for one flash. */
+  function miniScreen(s, axisX) {
+    const fill = FLASH[s.sent_color] || FLASH.green;
+    const shape = SHAPES.has(s.sent_shape) ? s.sent_shape : "circle";
+    const p = POS[s.sent_position] != null ? POS[s.sent_position] : 0.5;
+    const W = axisX ? 160 : 100, H = axisX ? 100 : 160;
+    const span = axisX ? SHAPE_SPAN * H : 0.6 * W, rr = span / 2;
+    const cx = axisX ? W * p : W / 2, cy = axisX ? H / 2 : H * p;
+    let body;
+    if (shape === "circle") body = `<circle cx="${cx}" cy="${cy}" r="${rr}" fill="${fill}"/>`;
+    else if (shape === "square") body = `<rect x="${cx - rr}" y="${cy - rr}" width="${span}" height="${span}" fill="${fill}"/>`;
+    else { const th = (span * Math.sqrt(3)) / 2; body = `<polygon points="${cx},${cy - th / 2} ${cx - rr},${cy + th / 2} ${cx + rr},${cy + th / 2}" fill="${fill}"/>`; }
+    return svg(`<rect class="screenBg" x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" rx="5"/>${body}`, `0 0 ${W} ${H}`, `mini ${axisX ? "wide" : "tall"}`);
+  }
+
+  /** 12px glyph of the sent shape in its colour, for the thumbnail strip. */
+  function glyph(s) {
+    const fill = FLASH[s.sent_color] || FLASH.green;
+    const shape = SHAPES.has(s.sent_shape) ? s.sent_shape : "circle";
+    const body = shape === "circle" ? `<circle cx="6" cy="6" r="5" fill="${fill}"/>`
+      : shape === "square" ? `<rect x="1" y="1" width="10" height="10" fill="${fill}"/>`
+      : `<polygon points="6,1 11,10.5 1,10.5" fill="${fill}"/>`;
+    return svg(body, "0 0 12 12", "glyph");
+  }
+
+  function describe(s, axisX) {
+    const pos = axisX ? POS_NAME_X[s.sent_position] || s.sent_position : s.sent_position;
+    return [s.sent_color, s.sent_shape, pos].filter(Boolean).join(" ").replace(/^(\w+) (\w+) (\w+)$/, "$1 $2, $3");
+  }
+
+  function buildReplay(states, axisX, failed) {
+    const replay = h("div", "replay");
+    const screens = h("div", "stack screenStack"), eyes = h("div", "stack eyeStack");
+    const thumbs = h("div", "thumbs");
+    thumbs.setAttribute("role", "listbox");
+    thumbs.setAttribute("aria-label", "Flashes");
+    const frames = states.map((s, i) => {
+      const ok = isMatch(s);
+      const scr = miniScreen(s, axisX);
+      screens.append(scr);
+      let eye;
+      if (typeof s.crop_jpeg_b64 === "string" && s.crop_jpeg_b64.length > 50) {
+        eye = h("img", "crop"); eye.alt = ""; eye.decoding = "async";
+        eye.src = `data:image/jpeg;base64,${s.crop_jpeg_b64}`;
+        eye.onerror = () => { const ph = h("div", "crop missing", "no crop"); eye.replaceWith(ph); frames[i].eye = ph; };
+      } else eye = h("div", "crop missing", "no crop");
+      eyes.append(eye);
+      const th = h("button", `thumb ${ok ? "t-ok" : "t-bad"}`);
+      th.type = "button";
+      th.setAttribute("role", "option");
+      th.setAttribute("aria-label", `Flash ${i + 1}: ${describe(s, axisX)}, ${ok ? "read back" : "mismatch"}`);
+      const face = typeof s.crop_jpeg_b64 === "string" && s.crop_jpeg_b64.length > 50 ? h("img", "") : h("i", "noCrop");
+      if (face.tagName === "IMG") { face.alt = ""; face.src = eye.src; }
+      th.append(h("span", "thumbImg", face, h("i", `dot ${ok ? "t-ok" : "t-bad"}`)), glyph(s));
+      th.onclick = () => { stopAuto(); select(i); };
+      thumbs.append(th);
+      return { s, ok, scr, eye, th };
+    });
+
+    const status = h("div", "frameStatus");
+    const counter = h("span", "label counter", "");
+    const what = h("span", "what", "");
+    const mark = h("span", "readMark", "");
+    status.append(counter, what, mark);
+
+    const feature = h("div", "feature",
+      h("figure", "shot", screens, h("figcaption", "label", "Screen showed")),
+      icon("arrow", "ico arrow"),
+      h("figure", "shot", eyes, h("figcaption", "label", "Eye reflected")),
+    );
+    const progress = h("div", "progress");
+    const bar = h("i", "");
+    progress.append(bar);
+    replay.append(feature, status, thumbs, progress);
+
+    let cur = -1, auto = null;
+    function select(i) {
+      if (i === cur) return;
+      cur = i;
+      frames.forEach((f, k) => {
+        f.scr.classList.toggle("on", k === i);
+        f.eye.classList.toggle("on", k === i);
+        f.th.classList.toggle("on", k === i);
+        f.th.setAttribute("aria-selected", k === i ? "true" : "false");
+      });
+      const f = frames[i];
+      counter.textContent = `Flash ${i + 1} of ${frames.length}`;
+      what.textContent = describe(f.s, axisX);
+      mark.className = `readMark ${f.ok ? "t-ok" : "t-bad"}`;
+      mark.innerHTML = "";
+      let readAs = "";
+      if (!f.ok) {
+        const dp = f.s.decoded_position && f.s.decoded_position !== f.s.sent_position
+          ? (axisX ? POS_NAME_X[f.s.decoded_position] || f.s.decoded_position : f.s.decoded_position) : "";
+        const ds = f.s.decoded_shape && f.s.decoded_shape !== "?" && f.s.decoded_shape !== f.s.sent_shape ? f.s.decoded_shape : "";
+        const parts = [ds, dp].filter(Boolean);
+        readAs = parts.length ? ` · eye showed ${parts.join(", ")}` : "";
+      }
+      mark.append(icon(f.ok ? "check" : "cross", "ico"), f.ok ? "read back" : `mismatch${readAs}`);
+      bar.style.width = `${((i + 1) / frames.length) * 100}%`;
+    }
+    function stopAuto() { if (auto) { clearTimeout(auto); auto = null; } replay.classList.remove("playing"); }
+
+    // After playing through, rest on the first mismatch when the check failed, else on the last flash.
+    const restAt = () => { const k = failed ? frames.findIndex((f) => !f.ok) : -1; return k >= 0 ? k : frames.length - 1; };
+    replay.play = () => {
+      if (reducedMotion() || frames.length < 2) { select(restAt()); return; }
+      replay.classList.add("playing");
+      let i = 0;
+      select(0);
+      const step = () => {
+        i += 1;
+        if (i < frames.length) { select(i); auto = later(step, 560); }
+        else { auto = later(() => { stopAuto(); select(restAt()); }, 700); }
+      };
+      auto = later(step, 700);
+    };
+    select(0);
+    pending.push(() => replay.play());
+    return replay;
+  }
+
+  // ---------- light response chart ----------
+  function animateChart(canvas, plot, card) {
+    const colors = { r: cssVar("--bad", card) || "#ff5d5d", g: cssVar("--ok", card) || "#35d49a", grid: cssVar("--line", card) || "#232936", text: cssVar("--text-3", card) || "#5f6878" };
+    let progress = 1;
+    const draw = () => drawChart(canvas, plot, colors, progress);
+    if (reducedMotion()) { draw(); }
+    else {
+      const t0 = performance.now(), dur = 1200;
+      const tick = (now) => {
+        const x = Math.min(1, (now - t0) / dur);
+        progress = 1 - Math.pow(1 - x, 3);
+        draw();
+        if (x < 1) frame(tick);
+      };
+      progress = 0;
+      frame(tick);
+    }
+    if ("ResizeObserver" in window) {
+      const ro = new ResizeObserver(() => draw());
+      ro.observe(canvas);
+      live.observers.push(ro);
+    }
+  }
+
+  function drawChart(canvas, plot, colors, progress) {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
     const g = canvas.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
+    const t = plot.t, n = Math.min(t.length, plot.expected.length, plot.measured.length);
+    const t0 = fin(t[0]) || 0, t1 = fin(t[n - 1]) || t0 + 1;
+    const padL = 18, padR = 4, padT = 4, padB = 14, gap = 10;
+    const paneH = (h - padT - padB - gap) / 2;
+    const plotW = w - padL - padR;
+    const X = (i) => padL + ((t[i] - t0) / (t1 - t0 || 1)) * plotW;
+    g.font = `500 10px ${cssVar("--mono") || "ui-monospace, monospace"}`;
+    g.textBaseline = "middle";
 
-    let x0 = Infinity, x1 = -Infinity, lanes = 1;
-    for (const s of series) {
-      if (!s.x || !s.x.length) continue;
-      x0 = Math.min(x0, s.x[0]); x1 = Math.max(x1, s.x[s.x.length - 1]);
-      lanes = Math.max(lanes, (s.lane || 0) + 1);
-    }
-    if (!isFinite(x0) || !isFinite(x1)) return;
-    const padL = 26, padR = 8, padT = 8, padB = 22, gap = 14;
-    const plotW = Math.max(10, w - padL - padR), laneH = (h - padT - padB - gap * (lanes - 1)) / lanes;
-    const laneTop = (i) => padT + i * (laneH + gap);
-    const X = (t) => padL + ((t - x0) / (x1 - x0 || 1)) * plotW;
-
-    // Grid: one hairline per second, a frame per lane, channel letters on the left.
-    g.font = `10px ${MONO}`;
-    g.textBaseline = "alphabetic";
-    g.lineWidth = 1;
-    for (let sec = Math.ceil(x0 - 0.2); sec <= x1 + 1e-6; sec++) {
-      const px = Math.round(X(Math.max(sec, x0))) + 0.5;
-      g.strokeStyle = "rgba(255,255,255,.045)";
-      g.beginPath(); g.moveTo(px, padT); g.lineTo(px, h - padB + 4); g.stroke();
-      g.fillStyle = "rgba(139,150,168,.85)";
-      g.textAlign = sec <= x0 + 0.2 ? "left" : "center";
-      g.fillText(`${sec}s`, sec <= x0 + 0.2 ? px - 1 : px, h - 5);
-    }
-    for (let i = 0; i < lanes; i++) {
-      g.strokeStyle = "rgba(255,255,255,.07)";
-      g.beginPath(); g.moveTo(padL, Math.round(laneTop(i) + laneH) + 0.5); g.lineTo(w - padR, Math.round(laneTop(i) + laneH) + 0.5); g.stroke();
-    }
-    g.textAlign = "left";
-    for (const s of series) {
-      if (!s.label) continue;
-      g.fillStyle = s.color;
-      g.fillText(s.label, 4, laneTop(s.lane || 0) + laneH / 2 + 3.5);
+    // seconds grid
+    g.strokeStyle = colors.grid; g.lineWidth = 1;
+    for (let s = Math.ceil(t0); s <= t1; s += 1) {
+      const x = Math.round(padL + ((s - t0) / (t1 - t0 || 1)) * plotW) + 0.5;
+      g.beginPath(); g.moveTo(x, padT); g.lineTo(x, h - padB); g.stroke();
+      g.fillStyle = colors.text; g.textAlign = "center";
+      g.fillText(`${s} s`, x, h - padB / 2 + 1);
     }
 
-    const geometry = (s) => {
-      const ys = s.y.filter((q) => fin(q) != null);
-      const lo = s.lo != null ? s.lo : Math.min.apply(null, ys), hi = s.hi != null ? s.hi : Math.max.apply(null, ys);
-      const top = laneTop(s.lane || 0) + 5, inner = laneH - 10, span = hi - lo;
-      return (y) => (span > 1e-9 ? top + inner - ((y - lo) / span) * inner : top + inner / 2);
-    };
-
-    const cutT = x0 + (x1 - x0) * p;
-    g.save();
-    g.beginPath(); g.rect(0, 0, X(cutT) + 0.5, h); g.clip();
-    g.lineJoin = "round"; g.lineCap = "round";
-    for (const s of series) {
-      if (!s.x || s.x.length < 2) continue;
-      const Y = geometry(s);
-      g.beginPath();
-      g.setLineDash(s.dash || []);
-      g.lineWidth = s.width || 2;
-      g.strokeStyle = s.color;
-      g.globalAlpha = s.alpha == null ? 1 : s.alpha;
-      g.shadowColor = s.glow ? s.color : "transparent";
-      g.shadowBlur = s.glow ? 7 : 0;
-      let pen = false;
-      for (let i = 0; i < s.x.length; i++) {
-        if (fin(s.y[i]) == null) { pen = false; continue; }
-        const px = X(s.x[i]), py = Y(s.y[i]);
-        pen ? g.lineTo(px, py) : g.moveTo(px, py);
-        pen = true;
-      }
-      g.stroke();
-    }
-    g.restore();
-    g.setLineDash([]);
-
-    // The sweep: a faint cursor line and a bright dot riding each measured trace.
-    if (p > 0 && p < 1) {
-      const cx = X(cutT);
-      g.strokeStyle = "rgba(255,255,255,.16)";
-      g.lineWidth = 1;
-      g.beginPath(); g.moveTo(cx, padT); g.lineTo(cx, h - padB); g.stroke();
-      for (const s of series) {
-        if (!s.head || !s.x || s.x.length < 2) continue;
-        let i = 1;
-        while (i < s.x.length - 1 && s.x[i] < cutT) i++;
-        const a = fin(s.y[i - 1]), b = fin(s.y[i]);
-        if (a == null || b == null) continue;
-        const k = clamp01((cutT - s.x[i - 1]) / (s.x[i] - s.x[i - 1] || 1));
-        g.fillStyle = s.color; g.shadowColor = s.color; g.shadowBlur = 12;
-        g.beginPath(); g.arc(cx, geometry(s)(a + (b - a) * k), 3, 0, Math.PI * 2); g.fill();
-        g.shadowBlur = 0;
-      }
-    }
-  }
-
-  /** r.signals.lag.plot -> dashed "sent" and solid "measured" traces for the red and green channels. */
-  function lagSeries(plot) {
-    if (!plot || !Array.isArray(plot.t) || !Array.isArray(plot.expected) || !Array.isArray(plot.measured)) return null;
-    const n = Math.min(plot.t.length, plot.expected.length, plot.measured.length);
-    if (n < 2) return null;
-    const t = plot.t.slice(0, n), out = [];
-    [0, 1].forEach((ch) => {
-      const sent = [], seen = [];
-      let lo = Infinity, hi = -Infinity;
-      for (let i = 0; i < n; i++) {
-        const a = fin(plot.expected[i] && plot.expected[i][ch]), b = fin(plot.measured[i] && plot.measured[i][ch]);
-        sent.push(a); seen.push(b);
-        for (const q of [a, b]) if (q != null) { if (q < lo) lo = q; if (q > hi) hi = q; }
-      }
-      if (!isFinite(lo)) return;
-      out.push({ x: t, y: sent, lo, hi, color: TRACE[ch], dash: [5, 4], width: 1.25, alpha: 0.75, lane: ch, label: ch ? "G" : "R" });
-      out.push({ x: t, y: seen, lo, hi, color: TRACE[ch], width: 2, lane: ch, glow: true, head: true });
-    });
-    return out.length ? out : null;
-  }
-
-  let liveChart = null;                         // { canvas, series, done } for redraws on resize
-  function sweepChart(canvas, series, delayMs) {
-    liveChart = { canvas, series, done: false };
-    const mine = liveChart;
-    if (reducedMotion()) { mine.done = true; lineChart(canvas, series, 1); return; }
-    const DURATION = 1700, ease = (k) => 1 - Math.pow(1 - k, 2.2);
-    lineChart(canvas, series, 0);
-    setTimeout(() => {
-      const t0 = performance.now();
-      const frame = (now) => {
-        if (liveChart !== mine || !canvas.isConnected) return;
-        const k = clamp01((now - t0) / DURATION);
-        lineChart(canvas, series, ease(k));
-        if (k < 1) requestAnimationFrame(frame); else mine.done = true;
+    [{ ch: 0, label: "R", color: colors.r }, { ch: 1, label: "G", color: colors.g }].forEach((p, k) => {
+      const top = padT + k * (paneH + gap);
+      const ev = [], mv = [];
+      for (let i = 0; i < n; i++) { ev.push(fin(plot.expected[i] && plot.expected[i][p.ch])); mv.push(fin(plot.measured[i] && plot.measured[i][p.ch])); }
+      const vals = ev.concat(mv).filter((v) => v != null);
+      if (!vals.length) return;
+      let lo = Math.min(...vals), hi = Math.max(...vals);
+      if (hi - lo < 1e-6) { lo -= 0.01; hi += 0.01; }
+      const pad = (hi - lo) * 0.12;
+      const Y = (v) => top + paneH - ((v - lo + pad) / (hi - lo + 2 * pad)) * paneH;
+      // pane baseline + label
+      g.strokeStyle = colors.grid; g.beginPath(); g.moveTo(padL, top + paneH + 0.5); g.lineTo(w - padR, top + paneH + 0.5); g.stroke();
+      g.fillStyle = p.color; g.textAlign = "left"; g.fillText(p.label, 2, top + paneH / 2);
+      // series, clipped to the draw head
+      g.save();
+      g.beginPath(); g.rect(0, 0, padL + plotW * progress + 1, h); g.clip();
+      const line = (ys, dashed) => {
+        g.beginPath();
+        g.setLineDash(dashed ? [3, 3] : []);
+        g.lineWidth = dashed ? 1 : 1.6;
+        g.strokeStyle = p.color;
+        g.globalAlpha = dashed ? 0.5 : 1;
+        let pen = false;
+        for (let i = 0; i < n; i++) {
+          if (ys[i] == null) { pen = false; continue; }
+          const x = X(i), y = Y(ys[i]);
+          pen ? g.lineTo(x, y) : g.moveTo(x, y);
+          pen = true;
+        }
+        g.stroke();
+        g.globalAlpha = 1; g.setLineDash([]);
       };
-      requestAnimationFrame(frame);
-    }, delayMs);
-  }
-  window.addEventListener("resize", () => {
-    if (liveChart && liveChart.done && liveChart.canvas.isConnected) lineChart(liveChart.canvas, liveChart.series, 1);
-  });
+      line(ev, true);
+      line(mv, false);
+      g.restore();
+    });
 
-  // ---------- sections ----------
-
-  const VERDICT = {
-    verified: { kind: "ok", title: "Live human verified", word: "Verified" },
-    unverified: { kind: "bad", title: "Not a live human", word: "Rejected" },
-    unverifiable: { kind: "warn", title: "Couldn't verify", word: "Couldn't verify" },
-  };
-
-  function heroHtml(r, V) {
-    const secs = fin(r.processing_s);
-    const raw = String(r.reason || "").trim();
-    const plain = friendly(raw) || (V.kind === "ok" ? COPY[0][1] : "");
-    return `
-      <div class="heroGlow" aria-hidden="true"></div>
-      ${markSvg(V.kind)}
-      <h2 class="heroTitle">${esc(V.title)}</h2>
-      <p class="heroWhy">${esc(plain)}</p>
-      <div class="heroMeta">
-        ${secs != null ? `<span class="chip num">checked in ${secs.toFixed(1)} s</span>` : ""}
-        ${raw && raw !== plain ? `<span class="tech"><span class="techKey">technical detail</span> <span class="num">${esc(raw)}</span></span>` : ""}
-      </div>`;
-  }
-
-  function punchlineHtml(r, V, tiles) {
-    const faceTile = tiles.find((t) => t.name === "Face match");
-    let sim = fin(r.signals && r.signals.identity && r.signals.identity.similarity);
-    if (sim == null && faceTile && /^-?\d*\.?\d+$/.test(String(faceTile.headline || "").trim())) sim = parseFloat(faceTile.headline);
-    const approves = sim != null && sim >= PASS_MARK;
-    const noFace = (r.signals && r.signals.identity && r.signals.identity.reason) || (faceTile && faceTile.detail) || "no face found in the selfie";
-
-    const selfie = r.capture ? `<img class="selfie" alt="The selfie from this check" src="/captures/${encodeURIComponent(r.capture)}/selfie.jpg">` : "";
-    const face = sim != null ? `
-        <div class="cellMain">${selfie}
-          <div><div class="big num">${fix2(sim)}</div><div class="unit">similarity to the enrolled face</div></div>
-        </div>
-        <div class="meter">
-          <div class="bar"><i class="fill" style="width:${(clamp01(sim) * 100).toFixed(1)}%"></i><i class="tick" style="left:${PASS_MARK * 100}%"></i></div>
-          <div class="scale num"><span>0</span><span class="pass" style="left:${PASS_MARK * 100}%">${PASS_MARK} pass mark</span><span>1</span></div>
-        </div>
-        <div class="say ${approves ? "ok" : "bad"}">${ICON[approves ? "ok" : "bad"]}<span>${approves ? "would approve" : "would reject"}</span></div>` : `
-        <div class="cellMain">${selfie}
-          <div><div class="big num dim">n/a</div><div class="unit">${esc(sentence(noFace).replace(/\.$/, ""))}</div></div>
-        </div>
-        <div class="meter">
-          <div class="bar"><i class="tick" style="left:${PASS_MARK * 100}%"></i></div>
-          <div class="scale num"><span>0</span><span class="pass" style="left:${PASS_MARK * 100}%">${PASS_MARK} pass mark</span><span>1</span></div>
-        </div>
-        <div class="say warn">${ICON.warn}<span>nothing to compare</span></div>`;
-
-    const lights = tiles.filter((t) => t.name).map((t) =>
-      `<span class="sig ${STATUS[t.status] || "warn"}"><i></i>${esc(t.name)}</span>`).join("");
-    const why = V.kind === "ok" ? "Live, and the enrolled person" : friendlyShort(r.reason);
-
-    let strip = "";
-    if (V.kind === "ok") strip = `<div class="strip ok">${ICON.ok}<span>Both agree: this is the enrolled person, and they are live.</span></div>`;
-    else if (approves && V.kind === "bad") strip = `<div class="strip bad">${ICON.warn}<span>Face recognition was fooled. InHuman caught it.</span></div>`;
-    else if (approves) strip = `<div class="strip warn">${ICON.warn}<span>Face recognition would approve. InHuman won't until it sees proof of a live person.</span></div>`;
-    else if (sim != null) strip = `<div class="strip flat"><span>Both reject: the selfie doesn't match the enrolled face.</span></div>`;
-
-    return `
-      <div class="versus">
-        <div class="cell">
-          <div class="eyebrow">Face recognition alone</div>
-          ${face}
-        </div>
-        <div class="vs" aria-hidden="true"><span>vs</span></div>
-        <div class="cell ours st-${V.kind}">
-          <div class="eyebrow">InHuman</div>
-          <div class="oursWord"><span class="badge">${ICON[V.kind]}</span>${esc(V.word)}</div>
-          <div class="oursWhy">${esc(why)}</div>
-          ${lights ? `<div class="sigs">${lights}</div>` : ""}
-        </div>
-      </div>${strip}`;
-  }
-
-  function stateMatched(s) {
-    if (typeof s.match === "boolean") return s.match;
-    if (s.decoded_shape && s.decoded_shape !== "?" && s.sent_shape) return s.decoded_shape === s.sent_shape;
-    return null;
-  }
-
-  function eyeHtml(r, tiles) {
-    const tile = tiles.find((t) => t.name === "Eye reflection");
-    const cornea = (r.signals && r.signals.cornea) || null;
-    if (!tile && !cornea) return "";
-    const states = cornea && Array.isArray(cornea.states) ? cornea.states.filter((s) => s && s.crop_jpeg_b64) : [];
-    const axis = cornea && cornea.position_axis === "x" ? "x" : "y";
-    const where = axis === "x" ? { top: "left", middle: "middle", bottom: "right" } : { top: "top", middle: "middle", bottom: "bottom" };
-    const st = tile ? STATUS[tile.status] || "warn" : cornea && cornea.ok ? "ok" : "warn";
-
-    let body;
-    if (states.length) {
-      const good = states.filter((s) => stateMatched(s) === true).length;
-      const film = states.map((s, i) => {
-        const m = stateMatched(s), cls = m === true ? "ok" : m === false ? "bad" : "unk";
-        const label = `${s.sent_color || ""} ${s.sent_shape || "shape"}, ${where[s.sent_position] || s.sent_position || ""}`.trim();
-        return `<figure class="crop ${cls}" style="--j:${i}" title="${esc(`Screen showed a ${label}`)}">
-          <div class="cropImg"><img alt="${esc(`Eye during flash ${i + 1}`)}" src="data:image/jpeg;base64,${esc(s.crop_jpeg_b64)}">
-            ${m == null ? "" : `<span class="stamp">${ICON[m ? "ok" : "bad"]}</span>`}</div>
-          <figcaption>${screenGlyph(s.sent_shape, s.sent_color, s.sent_position, axis)}<span class="num">${esc(where[s.sent_position] || s.sent_position || "")}</span></figcaption>
-        </figure>`;
-      }).join("");
-      const facts = [];
-      if (cornea) {
-        if (fin(cornea.reflection_width_mm) != null) facts.push(`reflection ${cornea.reflection_width_mm.toFixed(1)} mm wide`);
-        if (fin(cornea.distance_mm) != null) facts.push(`eye ${Math.round(cornea.distance_mm)} mm from the camera`);
-        if (fin(cornea.position_corr) != null) facts.push(`position match ${fix2(cornea.position_corr)}`);
-        if (fin(cornea.color_score) != null) facts.push(`colour match ${fix2(cornea.color_score)}`);
-      }
-      body = `
-        <div class="film">${film}</div>
-        <div class="readout">
-          <span class="num strong">${good} of ${states.length} flashes read correctly</span>
-          <span class="legendGlyph">${screenGlyph("circle", "green", "middle", axis)}<span>what the screen showed, and where</span></span>
-        </div>
-        ${facts.length ? `<div class="facts num">${facts.map((f) => `<span>${esc(f)}</span>`).join("")}</div>` : ""}`;
-    } else {
-      const raw = (cornea && cornea.reason) || (tile && tile.detail) || (tile && tile.headline) || "";
-      body = `
-        <div class="empty">
-          <svg viewBox="0 0 64 40" aria-hidden="true"><path d="M3 20C11 8 21 3 32 3s21 5 29 17c-8 12-18 17-29 17S11 32 3 20Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="32" cy="20" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 36 52 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          <div><p>${esc(friendly(raw) || "The eye check didn't produce a reading.")}</p>${raw ? `<p class="tech"><span class="techKey">technical detail</span> <span class="num">${esc(raw)}</span></p>` : ""}</div>
-        </div>`;
+    if (progress < 1) {
+      const x = Math.round(padL + plotW * progress) + 0.5;
+      g.strokeStyle = colors.text; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x, padT); g.lineTo(x, h - padB); g.stroke();
     }
-    return `
-      <header class="cardHead">
-        <div><div class="eyebrow">Evidence 01</div><h3>Reflection read from the eye</h3>
-          <p class="lede">A real cornea mirrors the screen. Each flash should show up as a small bright reflection, in the colour and place the screen showed it.</p></div>
-        ${tile && tile.headline ? `<div class="headStat st-${st}"><i class="dot"></i><span>${esc(tile.headline)}</span></div>` : ""}
-      </header>${body}`;
-  }
-
-  function lightHtml(r, tiles, hasPlot) {
-    const tile = tiles.find((t) => t.name === "Light response");
-    const lag = (r.signals && r.signals.lag) || null;
-    if (!tile && !lag) return "";
-    const st = tile ? STATUS[tile.status] || "warn" : "ok";
-    const head = String((tile && tile.headline) || "");
-    const hasLag = tile ? /^lag\b/i.test(head) : !!(lag && lag.ok !== false);
-    const lagMs = hasLag ? fin(lag && lag.lag_ms) ?? fin(parseFloat(head.replace(/[^\d.]/g, ""))) : null;
-    const limitMatch = /limit\s+(\d+(?:\.\d+)?)\s*ms/i.exec(String((tile && tile.detail) || ""));
-    const limit = limitMatch ? parseFloat(limitMatch[1]) : null;
-    const matchScore = fin(lag && lag.response_r2);
-
-    let stat;
-    if (lagMs != null) {
-      const scaleMax = Math.max((limit || 0) * 1.6, lagMs * 1.15, 1);
-      stat = `
-        <div class="big num">${Math.round(lagMs)}<small>ms</small></div>
-        <div class="unit">delay between the screen and the skin</div>
-        ${limit != null ? `<div class="meter">
-          <div class="bar"><i class="fill ${st}" style="width:${(clamp01(lagMs / scaleMax) * 100).toFixed(1)}%"></i><i class="tick" style="left:${((limit / scaleMax) * 100).toFixed(1)}%"></i></div>
-          <div class="scale num"><span>0</span><span class="pass" style="left:${((limit / scaleMax) * 100).toFixed(1)}%">limit ${Math.round(limit)} ms</span><span></span></div>
-        </div>` : ""}`;
-    } else {
-      stat = `<div class="big word">${esc(head || "Not measured")}</div>
-        <div class="unit">${esc(st === "bad" ? "The skin's colour didn't follow the screen." : friendly((lag && lag.reason) || (tile && tile.detail)) || "")}</div>`;
-    }
-    const chart = hasPlot ? `
-        <div class="scopeBox">
-          <canvas class="scope" aria-label="Chart: what the screen sent against what the skin did"></canvas>
-          <div class="legend"><span><i class="ln dash"></i>what the screen sent</span><span><i class="ln"></i>what the skin did</span></div>
-        </div>` : `<div class="scopeBox none"><p>No light trace was recorded for this check.</p></div>`;
-    return `
-      <header class="cardHead">
-        <div><div class="eyebrow">Evidence 02</div><h3>Skin follows the screen's light</h3>
-          <p class="lede">The flashes light up the face. Live skin follows them at once. A generated face needs time to be drawn, so it falls behind.</p></div>
-        ${tile && tile.headline ? `<div class="headStat st-${st}"><i class="dot"></i><span>${esc(tile.headline)}</span></div>` : ""}
-      </header>
-      <div class="lightBody">
-        ${chart}
-        <div class="lagStat st-${st}">${stat}${matchScore != null ? `<div class="facts num"><span>signal match ${fix2(matchScore)}</span></div>` : ""}</div>
-      </div>`;
-  }
-
-  function rowsHtml(r, tiles) {
-    const rest = tiles.filter((t) => t.name && !SHOWN_ELSEWHERE.includes(t.name));
-    if (!rest.length) return "";
-    const wave = r.signals && r.signals.rppg && r.signals.rppg.plot && r.signals.rppg.plot.wave;
-    return `<div class="eyebrow pad">Also checked</div>` + rest.map((t) => `
-      <div class="row st-${STATUS[t.status] || "warn"}">
-        <i class="dot"></i>
-        <div class="rowMain"><div class="rowName">${esc(t.name)}</div>
-          <div class="rowBlurb">${esc(TILE_BLURB[t.name] || "")}</div>
-          ${t.detail ? `<div class="rowDetail num">${esc(t.detail)}</div>` : ""}</div>
-        ${t.name === "Heartbeat" && wave ? sparkline(wave) : ""}
-        <div class="rowHead num">${esc(t.headline || "")}</div>
-      </div>`).join("");
   }
 
   // ---------- render ----------
+  let pending = [];
 
-  function ensure(parent, id, tag, className) {
-    let el = byId(id);
-    if (!el) { el = document.createElement(tag); el.id = id; parent.appendChild(el); }
-    if (className != null) el.className = className;
-    return el;
-  }
-
-  function renderResults(r) {
+  function render(r) {
+    stopAll();
+    pending = [];
     r = r && typeof r === "object" ? r : {};
-    const tiles = (Array.isArray(r.tiles) ? r.tiles : []).filter((t) => t && typeof t === "object");
-    const V = VERDICT[r.verdict] || { kind: "warn", title: sentence(r.verdict || "No result").replace(/\.$/, ""), word: "No verdict" };
-    if (V.kind === "bad" && /selfie does not match/i.test(r.reason || "")) V.title = "Not the enrolled person";
+    const verdict = TITLE[r.verdict] ? r.verdict : "unverifiable";
+    const tone = TONE[verdict];
+    const tiles = (Array.isArray(r.tiles) ? r.tiles : []).filter((t) => t && typeof t === "object").map((t) => ({ ...t, name: String(t.name || "Check") }));
+    const sig = r.signals && typeof r.signals === "object" ? r.signals : {};
 
     const section = byId("results");
-    const wrap = section.querySelector(".resultsWrap") || section.appendChild(Object.assign(document.createElement("div"), { className: "resultsWrap" }));
+    const wrap = (section && section.querySelector(".resultsWrap")) || section;
+    const v = byId("verdict");
+    const grid = byId("tiles");
+    if (!wrap || !v || !grid) { console.error("results: #results markup is missing"); return; }
+    section.className = `screen tone-${tone}`;
 
-    const hero = ensure(wrap, "verdict", "div", `verdict hero rv st-${V.kind}`);
-    hero.style.setProperty("--i", 0);
-    hero.innerHTML = heroHtml(r, V);
+    buildHero(v, r, verdict, tone, tiles);
 
-    const stack = ensure(wrap, "tiles", "div", "tiles stack");
-    const series = lagSeries(r.signals && r.signals.lag && r.signals.lag.plot);
-    const cards = [
-      ["punch", punchlineHtml(r, V, tiles)],
-      ["eye", eyeHtml(r, tiles)],
-      ["light", lightHtml(r, tiles, !!series)],
-      ["rows", rowsHtml(r, tiles)],
-    ].filter((c) => c[1]);
-    stack.innerHTML = cards.map((c, i) => `<section class="panel ${c[0]} rv" style="--i:${i + 1}">${c[1]}</section>`).join("");
-    for (const img of stack.querySelectorAll("img")) img.addEventListener("error", () => img.remove());
+    let strip = wrap.querySelector(".compare");
+    if (!strip) { strip = h("section", "compare"); grid.before(strip); }
+    buildCompare(strip, r, verdict, tone, tiles, sig);
 
-    const timing = ensure(wrap, "timing", "p", "fine muted center");
-    timing.textContent = "";
-    timing.hidden = true;
+    grid.className = "tiles";
+    grid.innerHTML = "";
+    tiles.forEach((t, i) => grid.append(buildCard(t, i, r, sig)));
+    if (!tiles.length) grid.append(h("article", "ev tile in wide s-warn", h("p", "why", "No individual checks were reported for this result.")));
 
-    const done = ensure(wrap, "btnDone", "button", "primary rv");
-    done.style.setProperty("--i", cards.length + 1);
-    if (!done.textContent.trim()) done.textContent = "Done";
-    if (!done.onclick) done.onclick = () => reset();
-    let link = byId("attackLogLink");
-    if (!link) {
-      link = document.createElement("a");
-      link.id = "attackLogLink";
-      link.href = "/app/attacks.html";
-      link.innerHTML = 'See the attack log <span aria-hidden="true">&rarr;</span>';
+    const done = byId("btnDone");
+    if (done) { done.classList.add("in"); done.style.setProperty("--d", `${240 + tiles.length * 70 + 80}ms`); wrap.append(done); }
+
+    // Every check ever run, genuine and attack, in one place.
+    let log = byId("attackLogLink");
+    if (!log) {
+      log = h("a", "attackLog", "See every attack we threw at it \u2192");
+      log.id = "attackLogLink";
+      log.href = "attacks.html";
     }
-    link.className = "logLink rv";
-    link.style.setProperty("--i", cards.length + 2);
-    wrap.append(done, link);                       // keeps both last, in order, on every render
+    log.style.setProperty("--d", `${240 + tiles.length * 70 + 160}ms`);
+    log.classList.add("in");
+    wrap.append(log);
 
-    section.scrollTop = 0;
-    window.scrollTo(0, 0);
-    const canvas = stack.querySelector("canvas.scope");
-    liveChart = null;
-    // The canvas has no size until the screen is visible, so the sweep starts on the next frame.
-    if (canvas && series) requestAnimationFrame(() => sweepChart(canvas, series, reducedMotion() ? 0 : 120 * cards.findIndex((c) => c[0] === "light") + 350));
-    show("results");
+    if (typeof show === "function") show("results"); else section.hidden = false;
+    // visuals need layout (canvas size), so they start once the screen is showing
+    frame(() => { for (const fn of pending) { try { fn(); } catch (e) { console.warn("results: visual failed", e); } } pending = []; });
   }
 
-  window.lineChart = lineChart;
-  window.renderResults = renderResults;
+  window.renderResults = function renderResults(r) {
+    try { render(r); }
+    catch (e) {
+      console.error("results: render failed", e);
+      // never leave the user on the spinner
+      const v = byId("verdict");
+      if (v) { v.className = "verdict hero in tone-warn unverifiable"; v.innerHTML = ""; v.append(h("h2", "heroTitle", TITLE[r && TITLE[r.verdict] ? r.verdict : "unverifiable"]), h("p", "heroReason", sentence(r && r.reason) || "")); }
+      if (typeof show === "function") show("results");
+    }
+  };
 })();
