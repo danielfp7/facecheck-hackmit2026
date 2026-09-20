@@ -18,6 +18,9 @@ uv pip install --python .venv/bin/python -r requirements.txt
 # ships a static binary, linked into the venv's bin.
 uv pip install --python .venv/bin/python imageio-ffmpeg
 ln -sf "$(.venv/bin/python -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')" .venv/bin/ffmpeg
+# File mode also calls ffprobe, which that package doesn't ship; a small OpenCV stand-in covers it.
+printf '#!/bin/zsh\nexec "%s/.venv/bin/python" "%s/../ffprobe_shim.py" "$@"\n' "$PWD" "$PWD" > .venv/bin/ffprobe
+chmod +x .venv/bin/ffprobe
 
 HF=https://huggingface.co/hacksider/deep-live-cam/resolve/main
 for m in inswapper_128_fp16.onnx gfpgan-1024.onnx; do

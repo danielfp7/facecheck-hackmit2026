@@ -138,6 +138,14 @@ attack/run.sh
 
 In its window: **Select a face** → the victim's photo, then **Live**. macOS will ask for camera access for the terminal the first time. Make the preview as large as it goes, turn the Mac's brightness to maximum, and sit so the swapped face is roughly life-size. Expect single-digit fps on this Mac.
 
+**A better-looking deepfake: pre-render it.** Live swapping runs at about 4 fps on this Mac. For a screen attack the fake doesn't need to be live, so film 20 s of the attacker (QuickTime → New Movie Recording, face filling the frame, slow head turns, looking at the camera) and render it offline with the face enhancer:
+
+```sh
+attack/render.sh attack/Deep-Live-Cam/victim.jpg ~/Movies/attacker.mov ~/Movies/deepfake.mp4    # ~7-8 min for 20 s; add --fast to skip the enhancer
+```
+
+Play `deepfake.mp4` fullscreen and looped, then run the attacks below against it.
+
 **Attack 1: deepfake on a screen** (label `screen-attack`). The attacker sits at the Mac wearing the victim's face. On the phone choose the label, **Run a test check**, take the selfie *of the Mac screen*, then move the phone in to the on-screen eye as the app asks. Expected: the face match may well pass, since that is the point of a deepfake. It should then fail on **Eye reflection** (a flat screen has no cornea-sized reflection inside an iris) and probably on **Light response** (a glowing screen doesn't take on the phone's colors the way skin does).
 
 **Attack 2: deepfake for the selfie, real eye for the check** (label `screen-attack`). Take the selfie of the Mac screen, then turn the phone to the attacker's own real eye. Expected: **Continuity** fails, with "the camera view jumped", "a different face appeared", or "the face in the eye check is not the person in the selfie".
