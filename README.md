@@ -132,8 +132,8 @@ Only swap faces of teammates who have agreed to it. Call the enrolled person the
 **Start the live face swap**
 
 ```sh
-attack/setup.sh      # once; downloads ~600 MB of models
-cd attack/Deep-Live-Cam && .venv/bin/python run.py --execution-provider coreml --live-mirror --live-resizable
+attack/setup.sh      # once; downloads ~600 MB of models and a bundled ffmpeg
+attack/run.sh
 ```
 
 In its window: **Select a face** → the victim's photo, then **Live**. macOS will ask for camera access for the terminal the first time. Make the preview as large as it goes, turn the Mac's brightness to maximum, and sit so the swapped face is roughly life-size. Expect single-digit fps on this Mac.
