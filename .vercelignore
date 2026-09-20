@@ -1,0 +1,7 @@
+# Only web/ is deployed. Everything else is the server, the phone app or the attack rig.
+server/
+ios/
+attack/
+tools/
+docs/
+*.md

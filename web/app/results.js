@@ -263,7 +263,7 @@
       if (r.capture) {
         const img = h("img", "selfieThumb");
         img.alt = "";
-        img.src = `/captures/${encodeURIComponent(r.capture)}/selfie.jpg`;
+        img.src = (window.apiURL || ((u) => u))(`/captures/${encodeURIComponent(r.capture)}/selfie.jpg`);
         img.onerror = () => img.remove();
         row.append(img);
       }

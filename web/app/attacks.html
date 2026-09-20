@@ -126,7 +126,16 @@
   <p class="foot">Click any card to open its full result. Pass mark for face recognition: 0.35 cosine similarity.</p>
 </div>
 
+<script src="config.js"></script>
 <script>
+  // Same rule as app.js: empty means same origin; a static copy points at the real server.
+  const API = (() => {
+    const q = new URLSearchParams(location.search).get("api");
+    if (q !== null) { try { q ? localStorage.setItem("facecheck.api", q) : localStorage.removeItem("facecheck.api"); } catch {} return q.replace(/\/$/, ""); }
+    let saved = null;
+    try { saved = localStorage.getItem("facecheck.api"); } catch {}
+    return (saved || window.FACECHECK_API || "").replace(/\/$/, "");
+  })();
 (function () {
   "use strict";
   const PASS_MARK = 0.35;
@@ -216,7 +225,7 @@
     else pill = c.verdict === "verified" ? `<span class="pill ok">${ICON.ok}passed</span>`
       : c.verdict === "unverifiable" ? `<span class="pill warn">${ICON.warn}couldn't verify</span>` : `<span class="pill bad">${ICON.bad}rejected</span>`;
     const thumb = c.has_selfie
-      ? `<img class="thumb" alt="" src="/captures/${encodeURIComponent(c.name)}/selfie.jpg">`
+      ? `<img class="thumb" alt="" src="${API}/captures/${encodeURIComponent(c.name)}/selfie.jpg">`
       : `<span class="thumb none">${ICON.face}</span>`;
     const verdictWord = attack
       ? (fooled ? '<span class="fooled yes">fooled</span>' : sim == null ? '<span class="fooled na">no face found</span>' : '<span class="fooled no">not fooled</span>')
@@ -253,7 +262,7 @@
   async function load() {
     let caps;
     try {
-      const r = await fetch("/captures", { cache: "no-store" });
+      const r = await fetch(API + "/captures", { cache: "no-store" });
       if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
       caps = await r.json();
       if (!Array.isArray(caps)) throw new Error("unexpected response");

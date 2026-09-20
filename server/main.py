@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -36,6 +37,17 @@ SHAPE_MODE = os.environ.get("FACECHECK_SHAPE_MODE", "auto")
 CHALLENGE_TTL_S = 90
 
 app = FastAPI(title="FaceCheck")
+
+# A copy of the web client hosted elsewhere (Vercel) calls this server directly rather than
+# through the host that served it: a check uploads 8-80 MB of frames and static hosts cap a
+# proxied body far below that. Origins are restricted to *.vercel.app plus localhost;
+# credentials are off, and nothing here is authenticated by cookie.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https://[a-z0-9-]+\.vercel\.app|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?",
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 # In-memory state: fine for a demo, lost on restart.
 challenges: dict[str, tuple[float, challenge_mod.Challenge]] = {}

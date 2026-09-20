@@ -53,8 +53,27 @@ function toast(msg) {
   toast.timer = setTimeout(() => (t.hidden = true), 7000);
 }
 
+/**
+ * Where the server is. Empty means "same origin", which is the normal case when the server
+ * serves these files itself. A static copy hosted elsewhere (Vercel) needs an absolute URL,
+ * because the check uploads 8-80 MB of frames and no static host will proxy that. Set it
+ * once with ?api=https://... and it is remembered, or bake it into config.js.
+ */
+const API = (() => {
+  const q = new URLSearchParams(location.search).get("api");
+  if (q !== null) {
+    try { q ? localStorage.setItem("facecheck.api", q) : localStorage.removeItem("facecheck.api"); } catch {}
+    return q.replace(/\/$/, "");
+  }
+  let saved = null;
+  try { saved = localStorage.getItem("facecheck.api"); } catch {}
+  return (saved || window.FACECHECK_API || "").replace(/\/$/, "");
+})();
+const apiURL = (path) => API + path;
+window.apiURL = apiURL;   // results.js and attacks.html build capture URLs too
+
 async function api(path, opts) {
-  const r = await fetch(path, opts);
+  const r = await fetch(apiURL(path), opts);
   if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 200)}`);
   return r.json();
 }
