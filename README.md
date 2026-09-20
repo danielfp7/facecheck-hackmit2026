@@ -17,25 +17,10 @@ FaceCheck uses computer vision to verify identities against deepfake-generated i
 FaceCheck can perform its analysis in under five seconds, from both mobile and laptop devices, requiring only a camera to run.
  
 ## How We Built It
- 
-The app was made in two parts.
- 
-**Server (Python)** does the computations:
-- Generates a random sequence of colored shapes (triangles, squares, and circles in red, green, blue)
-- Checks the recorded video against the sequence by measuring how fast the skin follows the screen's light
-- Finds the screen's reflection in the cornea and fits a circle to the iris (the average diameter of the human iris is 12mm, so it doubles as a ruler for distance)
-- Runs face recognition to confirm one person throughout
-**Clients (web app + native iPhone app)** do the capturing:
-- Flash the screen at specific intervals synchronized with the camera
-- Record timestamps for each frame
-- Track eye positions to automatically find the user and start FaceChecking
-### Stack
- 
-| Component | Technology |
-|-----------|------------|
-| Server | Python (OpenCV, [face-recognition library or model name]) |
-| Web app | [React/plain JS] |
-| iOS app | Swift |
+
+The app was made in two parts. A Python server does the computations: it generates a random sequence of colored shapes (triangles, squares, and circles in red, green, blue), then checks the recorded video against the sequence by measuring how fast the skin colors mirrors the screen's light, finding the screen's reflection in the cornea and fitting a circle to the iris (the average diameter of the human iris is 12mm), and running face recognition to confirm one person throughout. A web app and a native iPhone app do the capturing: both flash the screen at specific intervals with the camera, record timestamps for each frame and track eye positions to automatically find and start FaceChecking.
+
+We utilized Python and OpenCV for the video analysis mechanism, and React/Swift to implement the web and iOS apps respectively, with the assistance of Claude Code.
  
 ## Team
  
@@ -48,26 +33,13 @@ The app was made in two parts.
  
 ## Challenges We Ran Into
  
-- Accounting for the wide variation in facial features, eye shapes, glasses, and skin tones, all of which change how reflections and brightness respond.
-- Lighting: bright rooms and windows compete with the screen's reflection, so we had to tune for signal-to-noise rather than assume a dark room.
-- Synchronizing screen flashes with camera frames precisely enough to trust the timing, especially across two different platforms.
-- Ethical and cybersecurity considerations when generating deepfakes to test against, so we limited ourselves to our own consenting faces and never stored generated media.
-- Testing across a full breadth of people and situations within a weekend.
+Some challenges we encountered while working on FaceCheck were making sure that FaceCheck worked well in different lighting condition or different face types, as well as trying to take account of additional factors like continuity of facial curve and face-matching with the screenshot provided to further increase the reliability of FaceCheck.
 ## Accomplishments We're Proud Of
  
 This was our first hackathon and first time working together. We are proud to have landed on a great idea and accomplished more than expected, and the experience of creating something functioning from scratch together was something that everyone found rewarding.
  
 ## What We Learned
- 
-- The strongest anti-deepfake signals aren't in the face. They're in how the face interacts with the world: light, reflection, and timing.
-- Real-world variance (lighting, hardware, glasses) is a bigger obstacle than the algorithm itself. Robustness is the product.
-- Precise hardware timing is hard, and camera frame rates are not as reliable as documentation implies.
-- How to scope: we cut features aggressively to ship one thing that works rather than three that almost do.
-- Biometric products live under real legal constraints (BIPA, GDPR, EU AI Act), and privacy-by-design, such as storing embeddings rather than images, has to start at the architecture stage.
+Some important lessons we learned, in addition to learning how to rapidly prototype an idea into code, was that variations in real-world scenarios were the most frequent causes of error, requiring constant attention into how we could compensate for such variations in our solution. Another important lesson was that given time and resource constraints, we needed to identify the key functionalities of our idea and focus on developing them rapidly.
 ## What's Next
  
-Our next steps for FaceCheck are to test it against a larger set of conditions and devices, and obtain precise statistics regarding false rejections and acceptances against deepfake models.
- 
-- **Accuracy:** Train on a larger and more diverse set of faces, lighting conditions, and devices, and benchmark false-accept and false-reject rates against a held-out set of modern deepfake generators.
-- **Integration:** Expand FaceCheck into an API with better documentation and functionality to facilitate using FaceCheck in apps and logins.
-- **Privacy and compliance:** Publish a retention and deletion policy, store only embeddings, and work toward BIPA and GDPR readiness before any real deployment.
+Next steps for FaceCheck in the near future would involve testing our mechanism across different devices and lighting conditions, as well as working to establish a retention and deletion policy for the face scans used to verify identities in the process.
