@@ -117,10 +117,15 @@ def generate(n_shapes: int = 7, state_s: float = 0.4, inverse: bool = False,
     add(None, "black", "black", "middle")
     last_color = None
     last_shape = None
+    # Every position appears about equally often, in random order. Independent draws can
+    # come out 6-of-7 the same (seen on a real run), which leaves the position score
+    # hanging on a single flash.
+    positions = [POSITIONS[i % len(POSITIONS)] for i in range(n_shapes)]
+    rng.shuffle(positions)
     for i in range(n_shapes):
         color = rng.choice([c for c in ("red", "green") if c != last_color])
         shape = rng.choice([s for s in SHAPES if s != last_shape])
-        pos = rng.choice(POSITIONS)
+        pos = positions[i]
         if inverse:
             add(shape, "black", color, pos)
         else:

@@ -73,12 +73,14 @@ def user_status(user: str):
 class AuthRequest(BaseModel):
     user: str
     app_name: str = "Demo Bank"
+    device: str = "any"          # "phone", "web" (this computer's webcam) or "any"
 
 
 @app.post("/auth/requests")
 def create_request(req: AuthRequest):
     rid = secrets.token_hex(6)
-    requests_[rid] = {"id": rid, "user": _safe(req.user), "app_name": req.app_name,
+    device = req.device if req.device in ("phone", "web", "any") else "any"
+    requests_[rid] = {"id": rid, "user": _safe(req.user), "app_name": req.app_name, "device": device,
                       "status": "pending", "created": time.time(), "result": None}
     return requests_[rid]
 
@@ -91,12 +93,14 @@ def get_request(rid: str):
 
 
 @app.get("/auth/pending")
-def pending(user: str):
-    """Polled by the phone every 2 s; stands in for a push notification."""
+def pending(user: str, device: str = "phone"):
+    """Polled by the clients every 2 s; stands in for a push notification. A request aimed
+    at one device is invisible to the other, so the phone and the web app don't race."""
     user = _safe(user)
     now = time.time()
     for r in sorted(requests_.values(), key=lambda r: r["created"]):
-        if r["user"] == user and r["status"] == "pending" and now - r["created"] < 120:
+        if (r["user"] == user and r["status"] == "pending" and now - r["created"] < 120
+                and r.get("device", "any") in ("any", device)):
             return {"request": r}
     return {"request": None}
 

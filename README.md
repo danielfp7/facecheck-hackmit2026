@@ -82,9 +82,9 @@ uv run --project server tools/mac_capture.py --synthetic --flat          # flat-
 
 ## Web app (computer + webcam)
 
-The same product in a browser, served by the same server: open <http://localhost:8000/app/> in Chrome. Enroll, then either **Run a test check** or press **Sign in** on the demo page at <http://localhost:8000> and approve it in the web app. Accounts are shared with the phone: enroll on either, verify on either.
+The same product in a browser, served by the same server: open <http://localhost:8000/app/> in Chrome. Enroll, then either **Run a test check**, or go to the demo page at <http://localhost:8000> and press **Sign in, verify on this computer**, which opens the web app straight onto that request. **Sign in, verify on my phone** sends it to the iPhone instead; a request aimed at one device is invisible to the other. Accounts are shared: enroll on either, verify on either.
 
-Flow: selfie at your normal distance → lean in to about 10 inches (25 cm) while the move is watched → full-screen flashes → 8 s pulse window → results tiles.
+Flow: selfie at your normal distance → lean in until the colored part of one eye fills the on-screen ring (about 8 inches / 20 cm) while the move is watched → full-screen flashes → 8 s pulse window → results tiles. The phone uses the same ring, sized for 4 inches: "put your eye in the outline" left people at 5-6 inches.
 
 What a browser changes, and how it is handled:
 

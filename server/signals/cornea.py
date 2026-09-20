@@ -28,7 +28,8 @@ from render import shape_mask, POSITION_Y
 CORNEA_FOCAL_MM = 3.9          # R/2 for a 7.8 mm cornea
 IRIS_DIAMETER_MM = 11.7
 LOCALIZE_W = 1080              # localisation runs with the frame's short side at most this
-DRIFT_PX = 70                  # eye drift tolerated between states, at LOCALIZE_W scale
+DRIFT_PX = 50                  # eye drift tolerated between states, at LOCALIZE_W scale. 70 was tried
+                               # and locks onto the wrong spot on a real capture; don't widen without data.
 CROP_HALF = 260                # eye crop half-size, at LOCALIZE_W scale
 MIN_READABLE_SPAN_PX = 18      # below this the outline can't be told apart; score layout only
 SCALES = np.linspace(0.6, 1.6, 8)
@@ -188,6 +189,22 @@ def _shift_crop(img: np.ndarray, cx: float, cy: float, half: int) -> np.ndarray:
     return cv2.warpAffine(img, M, (2 * half, 2 * half), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
 
 
+def _measure_glint(p: dict, gx: int, gy: int, fs: float) -> dict:
+    """Sub-pixel centre, size and colour of the blob at (gx, gy)."""
+    D, q = p["D"], int(round(10 * fs))
+    y0, x0 = max(gy - q, 0), max(gx - q, 0)
+    patch = D[y0:gy + q + 1, x0:gx + q + 1]
+    blob = patch >= 0.5 * patch.max() if patch.size and patch.max() > 0 else np.zeros_like(patch, bool)
+    if not blob.any():
+        return {"g": (float(gx), float(gy)), "diameter": 0.0, "rgb": np.zeros(3), "peak": 0.0}
+    yy, xx = np.nonzero(blob)
+    wts = patch[blob]
+    rgb = p["diff"][y0:gy + q + 1, x0:gx + q + 1][blob].mean(axis=0)
+    return {"g": (x0 + float((xx * wts).sum() / wts.sum()), y0 + float((yy * wts).sum() / wts.sum())),
+            "diameter": float(2.0 * np.sqrt(blob.sum() / np.pi)), "rgb": rgb,
+            "peak": float(p["score"][gy, gx])}
+
+
 def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = None) -> dict:
     """`stash`, if given, receives the reference eye crop and iris fit for the continuity check."""
     W, H = bundle.full_size
@@ -244,32 +261,30 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
     ref = crops[ref_idx]
     ref_gray = (ref @ LUMA).astype(np.float32)
 
-    # Glint per state, in crop coordinates.
+    # Glint per state, in crop coordinates. First pass: anywhere near the eye, which is
+    # only good enough to seed the iris fit (the median shrugs off a bad state).
     per = []
     for s in usable:
-        score, D = _glint_response(crops[s.index], crops[_nearest_black(ch, crops, s.index)], s, fs)
+        black = crops[_nearest_black(ch, crops, s.index)]
+        score, D = _glint_response(crops[s.index], black, s, fs)
         r = int(R * fs)
         ya, xa = max(int(seed[1]) - r, 0), max(int(seed[0]) - r, 0)
         win = score[ya:int(seed[1]) + r + 1, xa:int(seed[0]) + r + 1]
         wy, wx = np.unravel_index(int(np.argmax(win)), win.shape)
-        gx, gy = xa + wx, ya + wy
-        q = int(round(10 * fs))
-        patch = D[max(gy - q, 0):gy + q + 1, max(gx - q, 0):gx + q + 1]
-        blob = patch >= 0.5 * patch.max() if patch.max() > 0 else np.zeros_like(patch, bool)
-        yy, xx = np.nonzero(blob)
-        wts = patch[blob]
-        sx = gx - min(q, gx) + float((xx * wts).sum() / wts.sum()) if len(wts) else float(gx)
-        sy = gy - min(q, gy) + float((yy * wts).sum() / wts.sum()) if len(wts) else float(gy)
-        diameter = 2.0 * np.sqrt(blob.sum() / np.pi)
-        rgb_patch = (crops[s.index] - crops[_nearest_black(ch, crops, s.index)])[max(gy - q, 0):gy + q + 1, max(gx - q, 0):gx + q + 1]
-        rgb = rgb_patch[blob].mean(axis=0) if blob.any() else np.zeros(3)
-        per.append({"s": s, "g": (sx, sy), "diameter": float(diameter), "rgb": rgb, "D": D})
+        p = {"s": s, "D": D, "score": score, "diff": crops[s.index] - black}
+        p.update(_measure_glint(p, xa + wx, ya + wy, fs))
+        per.append(p)
 
     # Coarse size check before anything else: flat glass or a print reflects far too large.
     seed_med = np.median(np.array([p["g"] for p in per]), axis=0)
-    iris = fit_iris(ref_gray, (float(seed_med[0]), float(seed_med[1])), rmin=12 * fs, rmax=140 * fs)
-
+    # Smallest believable iris, from the distance the client asked for (people hold it up to
+    # ~2x further). A fixed small minimum lets the fit lock onto the pupil edge instead,
+    # which reads as twice the true distance.
     fov = np.deg2rad(float(meta["camera"].get("fov_deg", 46)))
+    asked_px_per_mm = W / (2 * float(meta.get("distance_mm", 120)) * np.tan(fov / 2))
+    rmin = max(12.0, 0.3 * (IRIS_DIAMETER_MM / 2) * asked_px_per_mm)
+    iris = fit_iris(ref_gray, (float(seed_med[0]), float(seed_med[1])), rmin=rmin, rmax=140 * fs)
+
     if iris is not None:
         px_per_mm = 2 * iris[2] / IRIS_DIAMETER_MM
         distance_mm = W / (2 * px_per_mm * np.tan(fov / 2))
@@ -308,6 +323,15 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
         res = cv2.matchTemplate(gray, tmpl, cv2.TM_CCOEFF_NORMED)
         _, _, _, loc = cv2.minMaxLoc(res)
         ox, oy = loc[0] - (tx - T), loc[1] - (ty - T)          # how far the eye moved vs reference
+        # Second pass: a corneal reflection is inside the iris, so only look there. Without
+        # this a blink sends the search to whatever else is bright nearby (seen on a real
+        # capture: one state landed 2.3 iris radii away and sank an otherwise perfect read).
+        yy, xx = np.ogrid[:gray.shape[0], :gray.shape[1]]
+        disk = (xx - (icx + ox)) ** 2 + (yy - (icy + oy)) ** 2 <= (0.95 * ir) ** 2
+        inside = np.where(disk, p["score"], 0.0)
+        gy, gx = np.unravel_index(int(np.argmax(inside)), inside.shape)
+        p["peak_anywhere"] = p["peak"]
+        p.update(_measure_glint(p, int(gx), int(gy), fs))
         if stash is not None:
             stash["offsets"][s.index] = (ox, oy)
         u = (p["g"][0] - ox - icx) / ir                          # reflection position in iris radii
@@ -342,46 +366,64 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
 
     us, vs = np.array(us), np.array(vs)
     sent_y = np.array([POSITION_Y[p["s"].position] for p in per])
+    # A state only counts if its reflection is there: a blink leaves nothing in the iris, and
+    # whatever noise is found instead must not vote. Compared within a colour, since the
+    # orange-red reflection is always fainter than the green one.
+    peaks = np.array([p["peak"] for p in per])
+    valid = np.zeros(len(per), bool)
+    for colour in {p["s"].shape_color for p in per}:
+        idx = np.array([i for i, p in enumerate(per) if p["s"].shape_color == colour])
+        valid[idx] = peaks[idx] >= 0.25 * np.median(peaks[idx])
+    for so, ok in zip(states_out, valid):
+        so["valid"] = bool(ok)
+    if valid.sum() < max(4, int(np.ceil(0.6 * len(per)))) or np.ptp(sent_y[valid]) == 0:
+        return {"ok": False, "reason": "the eye reflection was missing in too many flashes (keep the eye open and still)",
+                "valid_states": int(valid.sum())}
+
     # Phones place the shape top/middle/bottom; a wide laptop screen has no vertical room,
     # so the web client places it left/middle/right and the reflection moves along x.
     # A cornea mirrors left-right and whether the capture is mirrored varies by browser,
     # so along x only the strength of the relationship is scored, not its sign.
     axis = screen.get("position_axis", "y")
     along, across = (us, vs) if axis == "x" else (vs, us)
-    position_corr = float(np.corrcoef(along, sent_y)[0, 1]) if np.ptp(sent_y) > 0 and np.ptp(along) > 1e-6 else 0.0
+    position_corr = float(np.corrcoef(along[valid], sent_y[valid])[0, 1]) if np.ptp(along[valid]) > 1e-6 else 0.0
     position_corr_signed = position_corr
     if axis == "x":
         position_corr = abs(position_corr)
     # Decode each state's level from the fitted line, for the results tile.
-    if np.ptp(sent_y) > 0:
-        slope, icpt = np.polyfit(sent_y, along, 1)
-        levels = {name: icpt + slope * y for name, y in POSITION_Y.items()}
-        for so, v in zip(states_out, along):
-            so["decoded_position"] = min(levels, key=lambda n: abs(levels[n] - v))
+    slope, icpt = np.polyfit(sent_y[valid], along[valid], 1)
+    levels = {name: icpt + slope * y for name, y in POSITION_Y.items()}
+    for so, v in zip(states_out, along):
+        so["decoded_position"] = min(levels, key=lambda n: abs(levels[n] - v))
     shape_readable = bool(temps) and all(so["decoded_shape"] != "?" for so in states_out)
-    shape_acc = float(np.mean([so["decoded_shape"] == so["sent_shape"] for so in states_out])) if shape_readable else None
+    counted = [so for so in states_out if so["valid"]]
+    shape_acc = float(np.mean([so["decoded_shape"] == so["sent_shape"] for so in counted])) if shape_readable else None
     for so in states_out:
         ok_pos = so.get("decoded_position") == so["sent_position"]
-        so["match"] = bool(ok_pos and (not shape_readable or so["decoded_shape"] == so["sent_shape"]))
+        so["match"] = bool(so["valid"] and ok_pos and (not shape_readable or so["decoded_shape"] == so["sent_shape"]))
 
     # Color from sequential differences of the red-vs-green balance, so a color cast cancels.
     def balance(rgb):
         return float((rgb[0] - rgb[1]) / (abs(rgb[0]) + abs(rgb[1]) + 1e-6))
     sent_bal = {"red": balance(np.array(COLORS["red"], float)), "green": -1.0, "black": 0.0}
-    mb = np.array([balance(p["rgb"]) for p in per])
-    sb = np.array([sent_bal[p["s"].shape_color] for p in per])
+    mb = np.array([balance(p["rgb"]) for p, ok in zip(per, valid) if ok])
+    sb = np.array([sent_bal[p["s"].shape_color] for p, ok in zip(per, valid) if ok])
     dm, ds = np.diff(mb), np.diff(sb)
     keep = np.abs(ds) > 1e-3
     color_score = float((dm[keep] * ds[keep]).sum() / (np.linalg.norm(dm[keep]) * np.linalg.norm(ds[keep]) + 1e-9)) if keep.any() else 0.0
 
-    inside_iris = bool(np.median(np.hypot(us, vs)) < 1.0)
+    # The search above is confined to the iris, so ask instead whether the strongest blob
+    # found *anywhere* near the eye was that same one. For a flat screen or print it isn't.
+    same_blob = np.array([p["peak"] >= 0.5 * p["peak_anywhere"] for p in per])
+    inside_iris = bool(same_blob[valid].mean() >= 0.6)
     geometry_ok = bool(inside_iris and 0.3 <= size_ratio <= 3.0)
     return {
         "ok": True,
         "shape_readable": shape_readable,
         "shape_accuracy": None if shape_acc is None else round(shape_acc, 3),
         "position_corr": round(position_corr, 3),
-        "position_accuracy": round(float(np.mean([so.get("decoded_position") == so["sent_position"] for so in states_out])), 3),
+        "position_accuracy": round(float(np.mean([so["decoded_position"] == so["sent_position"] for so in counted])), 3),
+        "valid_states": int(valid.sum()),
         "color_score": round(color_score, 3),
         "geometry_ok": geometry_ok,
         "inside_iris": inside_iris,
@@ -393,6 +435,6 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
         "distance_mm": round(float(distance_mm)),
         "position_axis": axis,
         "position_corr_signed": round(position_corr_signed, 3),
-        "x_spread": round(float(np.std(across)), 3),
+        "x_spread": round(float(np.std(across[valid])), 3),
         "states": states_out,
     }

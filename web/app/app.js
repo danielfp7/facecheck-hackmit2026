@@ -15,6 +15,8 @@ const SCREENS = ["home", "approve", "warning", "camera", "uploading", "results"]
 const MAX_SELFIE_TO_CHECK_S = 20;
 const SHAPE_SPAN_OF_HEIGHT = 0.75;
 const POSITION_X = { top: 0.25, middle: 0.5, bottom: 0.75 };   // server names, used as left/middle/right here
+const TARGET_DISTANCE_MM = 200;      // ~8 in: as close as a fixed-focus laptop webcam stays usable
+const ASSUMED_FOV_DEG = 65;
 const now = () => performance.now() / 1000;
 const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
 
@@ -84,7 +86,7 @@ async function poll() {
     $("btnEnroll").disabled = false;
     $("status").textContent = enrolled ? `Waiting for a sign-in request for “${user()}”…` : "Enroll your face once to get started.";
     if (!enrolled) return;
-    const { request } = await api(`/auth/pending?user=${encodeURIComponent(user())}`);
+    const { request } = await api(`/auth/pending?user=${encodeURIComponent(user())}&device=web`);
     if (request && S.step === "home") {
       S.request = request;
       $("approveText").textContent = `${request.app_name} wants to confirm a live person is signing in as “${request.user}”.`;
@@ -207,9 +209,18 @@ function cameraMode(mode) {
   $("btnShutter").hidden = !selfie;
   $("btnReady").hidden = selfie;
   $("countdown").hidden = true;
+  // Ring the size an iris (11.7 mm) appears at the target distance. The video is shown
+  // object-fit: cover, so CSS px per video px is the larger of the two axis ratios.
+  const ring = $("ring");
+  ring.hidden = selfie;
+  if (!selfie) {
+    const pxPerMM = video.videoWidth / (2 * TARGET_DISTANCE_MM * Math.tan((ASSUMED_FOV_DEG * Math.PI) / 360));
+    const cssPerPx = Math.max(innerWidth / video.videoWidth, innerHeight / video.videoHeight);
+    ring.style.width = ring.style.height = `${11.7 * pxPerMM * cssPerPx}px`;
+  }
   $("camBanner").innerHTML = selfie
     ? `<b>${S.enrolling ? "Enroll: take a selfie" : "Take a selfie"}</b>Sit at your normal distance with your face inside the outline.`
-    : `<b>Keep the camera on your face</b>Without looking away, lean in until your face fills the outline, about 10 inches (25 cm) from the camera.<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
+    : `<b>Keep the camera on your face</b>Without looking away, lean in until the colored part of one eye fills the ring, about 8 inches (20 cm) from the camera.<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
 }
 
 async function begin(enrolling) {
@@ -387,11 +398,11 @@ async function upload(events, rppg) {
   const meta = {
     schema: 1, challenge_id: ch.id, device_model: deviceModel(),
     frames: F.ts, dropped: [], display_events: events,
-    camera: { width: full.width, height: full.height, fps: settings.frameRate || 30, fov_deg: 65, mirrored: false,
+    camera: { width: full.width, height: full.height, fps: settings.frameRate || 30, fov_deg: ASSUMED_FOV_DEG, mirrored: false,
               exposure_locked: S.exposureLocked, focus_locked: false, timestamp_source: S.tsSource },
     screen: { brightness: null, width_mm: (screen.width / 127) * 25.4, height_mm: heightMM,
               shape_span_mm: SHAPE_SPAN_OF_HEIGHT * heightMM * (innerHeight / screen.height), position_axis: "x" },
-    distance_mm: 250, imu: [], haptics: [],
+    distance_mm: TARGET_DISTANCE_MM, imu: [], haptics: [],
     session: { selfie_ts: S.selfieTs, challenge_start_ts: events[0]?.ts ?? 0, interruptions: 0 },
     transit_ts: T.ts.filter((_, i) => T.blobs[i]),
   };
@@ -514,7 +525,8 @@ function renderResults(r) {
 
 // ---------- wiring ----------
 
-$("user").value = localStorage.getItem("inhuman.user") || "daniel";
+const params = new URLSearchParams(location.search);
+$("user").value = params.get("user") || localStorage.getItem("inhuman.user") || "daniel";
 $("user").addEventListener("change", () => { localStorage.setItem("inhuman.user", user()); poll(); });
 $("btnEnroll").onclick = () => begin(true);
 $("btnTest").onclick = () => { S.request = null; show("warning"); };
@@ -530,6 +542,24 @@ $("btnDone").onclick = reset;
 document.addEventListener("visibilitychange", () => { if (document.hidden && locked()) broken("You left the page."); });
 document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && S.step === "challenge") broken("The check was stopped."); });
 
+/** Opened from a relying party's "verify on this computer": go straight to that request. */
+async function openLinkedRequest() {
+  const id = params.get("request");
+  if (!id) return;
+  history.replaceState(null, "", location.pathname);          // a reload shouldn't replay it
+  try {
+    const req = await api(`/auth/requests/${encodeURIComponent(id)}`);
+    if (req.status !== "pending") return toast("That sign-in request is no longer waiting.");
+    const enrolled = (await api(`/users/${encodeURIComponent(req.user)}`)).enrolled;
+    if (!enrolled) return toast(`“${req.user}” isn't enrolled yet. Enroll first, then sign in again.`);
+    S.request = req;
+    $("approveText").textContent = `${req.app_name} wants to confirm a live person is signing in as “${req.user}”.`;
+    show("approve");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
 show("home");
-poll();
+openLinkedRequest().then(poll);
 setInterval(poll, 2000);

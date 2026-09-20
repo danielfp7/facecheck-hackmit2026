@@ -28,6 +28,8 @@
   button { width: 100%; padding: 13px; border: 0; border-radius: 10px; background: var(--accent);
     color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
   button:disabled { opacity: .55; cursor: default; }
+  .choices { display: flex; flex-direction: column; gap: 10px; }
+  button.alt { background: transparent; color: var(--ink); border: 1px solid var(--line); }
   #status { margin-top: 20px; display: none; }
   .banner { border-radius: 12px; padding: 16px 18px; display: flex; gap: 14px; align-items: center; }
   .banner h2 { margin: 0; font-size: 18px; }
@@ -51,16 +53,18 @@
 <body>
 <main>
   <h1>Demo Bank</h1>
-  <p class="sub">Sign-in protected by InHuman: proves a live person is holding your phone.</p>
+  <p class="sub">Sign-in protected by InHuman: proves a live person is at the camera, on this computer or on your phone.</p>
   <div class="card">
     <label for="user">Username</label>
     <input id="user" value="daniel" autocomplete="off">
     <label for="pw">Password</label>
     <input id="pw" type="password" value="hunter2hunter2">
-    <button id="go">Sign in</button>
+    <div class="choices">
+      <button id="goWeb">Sign in, verify on this computer</button>
+      <button id="goPhone" class="alt">Sign in, verify on my phone</button>
+    </div>
     <div id="status"></div>
   </div>
-  <p class="sub" style="margin-top:16px;font-size:14px">Approve on your iPhone, or on this computer with the <a href="/app/" target="_blank" rel="noopener">InHuman web app</a>.</p>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -71,8 +75,11 @@ function show(html) { const s = $("status"); s.style.display = "block"; s.innerH
 
 function render(req) {
   if (req.status === "pending") {
+    const web = req.device === "web";
     return show(`<div class="banner pending"><div class="spinner"></div><div>
-      <h2>Check your phone</h2><p>Open InHuman and approve this sign-in.</p></div></div>`);
+      <h2>${web ? "Finish the check in the InHuman tab" : "Check your phone"}</h2>
+      <p>${web ? `It opened in a new tab. If it didn't, <a href="/app/?request=${esc(req.id)}&user=${esc(req.user)}" target="_blank" rel="noopener">open it here</a>.`
+               : "Open InHuman and approve this sign-in."}</p></div></div>`);
   }
   const r = req.result || {};
   const ok = r.verdict === "verified";
@@ -84,20 +91,33 @@ function render(req) {
     <div class="tiles">${tiles}</div>`);
 }
 
-$("go").onclick = async () => {
+const buttons = [$("goWeb"), $("goPhone")];
+
+async function signIn(device) {
   clearInterval(timer);
-  $("go").disabled = true;
+  buttons.forEach(b => b.disabled = true);
+  // Open the tab inside the click, before any await, or the pop-up blocker eats it.
+  const tab = device === "web" ? window.open("about:blank", "inhuman") : null;
   const res = await fetch("/auth/requests", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user: $("user").value.trim(), app_name: "Demo Bank" }) });
-  if (!res.ok) { show(`<div class="banner failed"><div><h2>Error</h2><p>${esc(await res.text())}</p></div></div>`); $("go").disabled = false; return; }
+    body: JSON.stringify({ user: $("user").value.trim(), app_name: "Demo Bank", device }) });
+  if (!res.ok) {
+    if (tab) tab.close();
+    show(`<div class="banner failed"><div><h2>Error</h2><p>${esc(await res.text())}</p></div></div>`);
+    buttons.forEach(b => b.disabled = false);
+    return;
+  }
   let req = await res.json();
+  if (tab) tab.location = `/app/?request=${encodeURIComponent(req.id)}&user=${encodeURIComponent(req.user)}`;
   render(req);
   timer = setInterval(async () => {
     req = await (await fetch(`/auth/requests/${req.id}`)).json();
     render(req);
-    if (req.status !== "pending") { clearInterval(timer); $("go").disabled = false; $("go").textContent = "Sign in again"; }
+    if (req.status !== "pending") { clearInterval(timer); buttons.forEach(b => b.disabled = false); }
   }, 1000);
-};
+}
+
+$("goWeb").onclick = () => signIn("web");
+$("goPhone").onclick = () => signIn("phone");
 </script>
 </body>
 </html>

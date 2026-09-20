@@ -194,12 +194,13 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
             detail = f"sensor felt {vibration['imu_detected']}/{n}, camera saw {vibration['video_detected']}/{n}"
             if vibration.get("motion_corr") is not None:
                 detail += f", video-gyro agreement {vibration['motion_corr']:.2f}"
-            if vibration["imu_detected"] < max(1, n - 1):
-                tiles.append(_tile("Vibration", "yellow", "Bursts not felt", detail))
-            elif vibration["video_detected"] >= max(1, n - 1) or (vibration.get("motion_corr") or 0) >= 0.5:
+            # We commanded the bursts, so whether the 100 Hz motion sensor resolved them is only a
+            # cross-check (sharp bursts are above what it can follow). What matters is whether
+            # the *camera* shook at those instants, or image motion follows the gyro.
+            if vibration["video_detected"] >= max(1, n - 1) or (vibration.get("motion_corr") or 0) >= 0.5:
                 tiles.append(_tile("Vibration", "green", "Camera moves with phone", detail))
             else:
-                tiles.append(_tile("Vibration", "yellow", "Camera didn't follow", detail))
+                tiles.append(_tile("Vibration", "yellow", "Camera shake unclear", detail))
 
     if failures:
         verdict, reason = "unverified", failures[0]

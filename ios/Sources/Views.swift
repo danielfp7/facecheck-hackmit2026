@@ -221,15 +221,25 @@ struct PositionView: View {
     var body: some View {
         ZStack {
             CameraPreview(session: flow.capture.session).ignoresSafeArea()
-            // One eye only: both don't fit in frame this close.
-            Ellipse()
-                .strokeBorder(.white.opacity(0.9), lineWidth: 3)
-                .frame(width: 260, height: 150)
+            // A ring the size the iris should appear at the target distance (irises are ~11.7 mm
+            // in everyone). "Put your eye in the outline" left people at 5-6 inches; matching
+            // the iris to a ring is a precise distance cue.
+            GeometryReader { geo in
+                let ring = irisRingDiameter(in: geo.size)
+                ZStack {
+                    Ellipse().strokeBorder(.white.opacity(0.55), lineWidth: 2)
+                        .frame(width: ring * 2.7, height: ring * 1.35)
+                    Circle().strokeBorder(.white, lineWidth: 3)
+                        .frame(width: ring, height: ring)
+                }
+                .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            }
+            .ignoresSafeArea()
             VStack {
                 VStack(spacing: 6) {
                     Text("Keep the camera on your face")
                         .font(.title2.bold())
-                    Text("Without lowering the phone, slowly bring it to about \(inches) inches from one eye, with that eye inside the outline.")
+                    Text("Without lowering the phone, slowly bring it in until the colored part of one eye fills the ring (about \(inches) inches).")
                         .font(.subheadline)
                     Text("The move is being watched. Looking away, covering the camera or leaving the app cancels the check.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -249,6 +259,16 @@ struct PositionView: View {
             }
             .padding(.bottom, 24)
         }
+    }
+
+    /// On-screen diameter of an iris at the working distance. The preview fills the screen
+    /// (aspect fill), so points per video pixel is the larger of the two axis ratios.
+    private func irisRingDiameter(in size: CGSize) -> CGFloat {
+        let fov = (flow.capture.cameraMeta["fov_deg"] as? Double) ?? 46
+        let frameW = 1080.0, frameH = 1920.0
+        let pxPerMM = frameW / (2 * flow.capture.workingDistanceMM * tan(fov * .pi / 360))
+        let pointsPerPx = max(Double(size.width) / frameW, Double(size.height) / frameH)
+        return CGFloat(11.7 * pxPerMM * pointsPerPx)
     }
 
     private func begin() {
