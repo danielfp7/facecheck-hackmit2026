@@ -1,12 +1,14 @@
+/* Older names in this file, mapped onto tokens.css. FaceCheck is dark whatever the machine
+   is set to: this used to carry its own light palette and, loading after tokens.css, it won
+   and turned the app light on a light-mode Mac. --bg, --line and --accent are deliberately
+   absent here so the tokens keep them. */
 :root {
-  --bg: #f4f5f7; --card: #ffffff; --ink: #14171f; --muted: #667085; --line: #e3e6ec;
-  --accent: #2447d6; --green: #12805c; --green-bg: #e3f6ee; --red: #b42318; --red-bg: #fdecea;
-  --yellow: #9a6700; --yellow-bg: #fff4d6;
-}
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #0e1116; --card: #171b22; --ink: #eef1f6; --muted: #98a2b3; --line: #2a303b;
-    --accent: #7d9bff; --green: #4ad6a3; --green-bg: #10302a; --red: #ff8a7a; --red-bg: #3a1815;
-    --yellow: #f2c14e; --yellow-bg: #362b0e; }
+  --card: var(--surface);
+  --ink: var(--text);
+  --muted: var(--text-2);
+  --green: var(--ok);   --green-bg: var(--ok-soft);
+  --red: var(--bad);    --red-bg: var(--bad-soft);
+  --yellow: var(--warn); --yellow-bg: var(--warn-soft);
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }

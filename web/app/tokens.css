@@ -2,6 +2,8 @@
    Every FaceCheck surface (app shell, camera HUD, results, the panel embedded in a relying
    party's page) reads these; nothing hard-codes a colour. */
 :root {
+  /* Dark whatever the machine is set to, so form controls and scrollbars match. */
+  color-scheme: dark;
   --bg: #0a0c10;            /* page */
   --surface: #11141a;       /* cards */
   --raised: #171b23;        /* things on cards */

@@ -6,7 +6,6 @@
 #results { align-items: start; color: var(--text); font-family: var(--font); background: var(--bg); }
 /* Guard: style.css still carries a light palette that overrides --bg/--line/--accent on a light-mode OS.
    Re-pin the tokens.css values here so this screen stays dark; delete once style.css is on tokens. */
-@media (prefers-color-scheme: light) { #results { --bg: #0a0c10; --line: #232936; --accent: #6e8bff; } }
 .resultsWrap { width: min(960px, 100%); display: flex; flex-direction: column; gap: 20px; padding: 4px 0 56px; }
 
 /* the verdict colour, picked once per screen */
