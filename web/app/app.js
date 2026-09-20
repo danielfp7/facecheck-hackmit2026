@@ -23,7 +23,7 @@ const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
 const S = {
   step: "home", enrolling: false, request: null, challenge: null,
   stream: null, track: null, selfie: null, selfieTs: null, exposureLocked: false, tsSource: "now",
-  tracker: { ready: false, on: false, raf: null, last: null, lostAt: null, goodSince: null, anchor: null, phase: null },
+  tracker: { ready: false, on: false, raf: null, last: null, lostAt: null, goodSince: null, startedAt: 0, phase: null },
   transit: { on: false, blobs: [], ts: [], timer: null },
   frames: { on: false, blobs: [], ts: [], pending: [] },
   aborted: null,
@@ -241,10 +241,13 @@ function startFrames() {
 
 const IRIS_MM = 11.7;
 const HOLD_S = 0.6;                 // how long a good pose must hold before it fires
+const SELFIE_MIN_S = 2.0;           // and the selfie waits at least this long either way, so
+                                    // the step is legible instead of firing the moment it opens
 const LOST_GRACE_S = 0.9;           // keep the last reading this long after losing the face
 const SELFIE_MIN_FACE = 0.32;       // face height as a fraction of frame: "fills the outline"
 const IN_OUTLINE_FRAC = 0.30;       // eye must sit within this fraction of the ring's radius
 const SIZE_TOL = 0.28;              // and its iris within this fraction of the ring's size
+const RING_DRAW_SCALE = 0.8;        // how big the ring is drawn, relative to that iris
 
 function trackerReady() { return !!(window.FaceCheckTracker && S.tracker.ready); }
 
@@ -295,7 +298,7 @@ function startTracking(phase) {
   const T = S.tracker;
   stopTracking();
   if (!trackerReady()) { setHud("hunting", phase === "selfie" ? "Fill the outline" : "Put your eye in the outline", "Then press the button"); return; }
-  T.on = true; T.phase = phase;
+  T.on = true; T.phase = phase; T.startedAt = now();
   const ring = $("ring"), guide = $("guide");
 
   const tick = () => {
@@ -332,8 +335,9 @@ function startTracking(phase) {
         setHud("hunting", "Closer", `${Math.round(mm)} mm away`);
       } else {
         if (T.goodSince == null) T.goodSince = t;
-        setHud("good", t - T.goodSince >= HOLD_S ? "Hold it" : "Hold still", `${Math.round(mm)} mm away`);
-        if (t - T.goodSince >= HOLD_S) { stopTracking(); shutter(); return; }
+        const ready = t - T.goodSince >= HOLD_S && t - T.startedAt >= SELFIE_MIN_S;
+        setHud("good", ready ? "Hold it" : "Hold still", `${Math.round(mm)} mm away`);
+        if (ready) { stopTracking(); shutter(); return; }
       }
       T.raf = requestAnimationFrame(tick);
       return;
@@ -388,9 +392,11 @@ function cameraMode(mode) {
   if (!selfie) {
     // Fixed target in the middle: the coloured part of one eye, at the working distance.
     // It does not move, because lining the eye up with it is what pins that distance.
+    // Drawn a little inside the iris it checks for, which reads better against a real eye.
+    // RING_DRAW_SCALE is presentation only; targetIrisPx() still decides the size check.
     const cssPerPx = Math.max(innerWidth / video.videoWidth, innerHeight / video.videoHeight);
     ring.style.left = ring.style.top = "50%";
-    ring.style.width = ring.style.height = `${2 * targetIrisPx() * cssPerPx}px`;
+    ring.style.width = ring.style.height = `${2 * targetIrisPx() * RING_DRAW_SCALE * cssPerPx}px`;
   }
   $("camBanner").innerHTML = selfie
     ? `<b>${S.enrolling ? "Enroll: look at the camera" : "Look at the camera"}</b>${trackerReady() ? "The photo takes itself once your face fills the outline." : "Lean in until your face fills the outline."}`

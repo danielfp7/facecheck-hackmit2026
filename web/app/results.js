@@ -30,7 +30,6 @@
   // What each check looks at, and why a face swap fails it.
   const EXPLAIN = {
     "Light response": "Skin lights up the instant the screen does. A deepfake has to see the flash, redraw the face and send it, so it arrives late.",
-    "Eye reflection": "Your eye is a tiny curved mirror. We flashed a random pattern and read it back off your cornea. A face swap redraws the eye and loses it.",
     "Face match": "The selfie against the face enrolled for this account. This is the one check a face swap is built to pass, which is why it is never enough on its own.",
     "Continuity": "The same face has to stay on camera from the selfie all the way in to the eye check. A swap that holds at arm's length falls apart when the eye fills the frame.",
     "Vibration": "The phone buzzes at random moments and the camera has to see the shake the motion sensor felt. A video fed into the phone never shakes.",
