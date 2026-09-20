@@ -22,7 +22,7 @@ from pathlib import Path
 import cv2
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from mac_capture import load_swapper  # noqa: E402
+from mac_capture import builtin_camera, load_swapper  # noqa: E402
 
 WIN = "live"
 DEFAULT_SOURCE = Path(__file__).resolve().parent / "Deep-Live-Cam/victim.jpg"
@@ -82,7 +82,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--source", nargs="+", default=[str(DEFAULT_SOURCE)],
                     help="photo(s) of the face to swap in; several of the same person give a steadier likeness")
-    ap.add_argument("--camera", type=int, default=0)
+    ap.add_argument("--camera", type=int, default=builtin_camera(), help="default: this Mac's own camera, not a nearby iPhone")
     ap.add_argument("--windowed", action="store_true", help="don't go full screen")
     args = ap.parse_args()
     for path in args.source:

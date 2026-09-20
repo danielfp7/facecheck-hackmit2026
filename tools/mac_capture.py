@@ -37,6 +37,20 @@ from render import render_color, render_state  # noqa: E402
 WIN = "InHuman challenge"
 
 
+def builtin_camera() -> int:
+    """OpenCV index of this Mac's own camera. With Continuity Camera on, a nearby iPhone is
+    listed as a webcam too, and OpenCV orders cameras by unique ID, which can put it first."""
+    import re
+    import subprocess
+    try:
+        out = subprocess.run(["system_profiler", "SPCameraDataType"], capture_output=True, text=True, timeout=10).stdout
+    except Exception:
+        return 0
+    cams = re.findall(r"^ {4}(\S.*):\n(?:.*\n)*? +Unique ID: (\S+)", out, flags=re.M)
+    names = [name for name, _ in sorted(cams, key=lambda c: c[1])]
+    return next((i for i, name in enumerate(names) if "iphone" not in name.lower()), 0)
+
+
 def load_swapper(source_path):
     """inswapper from Deep-Live-Cam's models folder, plus the source identity.
 
@@ -169,7 +183,7 @@ def main():
     ap.add_argument("--enroll", action="store_true", help="enroll this user's face and exit")
     ap.add_argument("--request-id", help="answer a pending 2FA request; default: pick up the user's pending one")
     ap.add_argument("--label", default="mac", help="tag for the saved capture folder (e.g. real, dlc-attack)")
-    ap.add_argument("--camera", type=int, default=0)
+    ap.add_argument("--camera", type=int, default=builtin_camera(), help="default: this Mac's own camera, not a nearby iPhone")
     ap.add_argument("--screen", type=int, nargs=2, default=(1440, 900), metavar=("W", "H"))
     ap.add_argument("--attack-delay-ms", type=float, default=0)
     ap.add_argument("--swap-source", help="image of the face to swap in (runs inswapper per frame)")
