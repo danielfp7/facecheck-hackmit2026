@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>InHuman</title>
+<title>FaceCheck</title>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="camera.css">
@@ -18,7 +18,7 @@
       <div class="logo" aria-hidden="true">
         <svg viewBox="0 0 48 48" width="56" height="56"><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z" fill="currentColor" opacity=".16"/><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="m17 24 5 5 9-10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
-      <h1>InHuman</h1>
+      <h1>FaceCheck</h1>
       <p id="injectNote" class="testNote" hidden>Attack test: the camera is replaced by the live face swap</p>
       <p id="status" class="muted">Connecting…</p>
       <label class="field">Username
@@ -69,7 +69,10 @@
         <div class="hudDot"></div>
         <div><div id="hudMain" class="hudMain"></div><div id="hudSub" class="hudSub num"></div></div>
       </div>
-      <div id="countdown" class="countdown" hidden></div>
+      <div id="countdown" class="countdown" hidden>
+        <div id="countdownNum" class="countdownNum num"></div>
+        <div class="countdownNote">Look at the camera head-on and make sure nothing is covering your eyes</div>
+      </div>
       <div class="controls">
         <button id="btnShutter" class="shutter" aria-label="Take selfie"></button>
         <button id="btnReady" class="primary" hidden>I'm in position</button>

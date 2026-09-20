@@ -19,13 +19,13 @@
     --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
     --shadow: 0 1px 2px rgba(16,24,40,.05), 0 10px 28px -18px rgba(16,24,40,.22);
 
-    /* ---- InHuman widget. Mirrors web/app/tokens.css so it reads as the same product. ---- */
-    --ih-bg: #0a0c10; --ih-surface: #11141a; --ih-raised: #171b23; --ih-line: #232936;
-    --ih-text: #eceff5; --ih-text-2: #9aa3b5; --ih-text-3: #5f6878;
-    --ih-accent: #6e8bff; --ih-accent-soft: rgba(110,139,255,.14);
-    --ih-ok: #35d49a; --ih-ok-soft: rgba(53,212,154,.13);
-    --ih-bad: #ff5d5d; --ih-bad-soft: rgba(255,93,93,.13);
-    --ih-warn: #ffb547; --ih-warn-soft: rgba(255,181,71,.13);
+    /* ---- FaceCheck widget. Mirrors web/app/tokens.css so it reads as the same product. ---- */
+    --fc-bg: #0a0c10; --fc-surface: #11141a; --fc-raised: #171b23; --fc-line: #232936;
+    --fc-text: #eceff5; --fc-text-2: #9aa3b5; --fc-text-3: #5f6878;
+    --fc-accent: #6e8bff; --fc-accent-soft: rgba(110,139,255,.14);
+    --fc-ok: #35d49a; --fc-ok-soft: rgba(53,212,154,.13);
+    --fc-bad: #ff5d5d; --fc-bad-soft: rgba(255,93,93,.13);
+    --fc-warn: #ffb547; --fc-warn-soft: rgba(255,181,71,.13);
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -169,85 +169,85 @@
   .activity .d code { color: var(--muted); }
   @media (max-width: 480px) { .activity li { grid-template-columns: 14px 1fr; } .activity time { grid-column: 2; order: 3; } .activity li + li::before { left: 6px; } }
 
-  /* Approval card: bank head, InHuman body */
+  /* Approval card: bank head, FaceCheck body */
   .approve > .head { align-items: flex-start; }
   .approve .head p { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
   .approve .head b { color: var(--ink); font-weight: 600; }
   .linkbtn { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: 12.5px; text-decoration: underline; cursor: pointer; white-space: nowrap; }
   .linkbtn:hover { color: var(--bad); }
 
-  .ih { background: var(--ih-bg); color: var(--ih-text); border-radius: 0 0 13px 13px; padding: 16px 20px 18px; }
-  .ih-head { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--ih-line); }
-  .ih-mark { width: 30px; height: 30px; color: var(--ih-accent); flex: none; }
+  .ih { background: var(--fc-bg); color: var(--fc-text); border-radius: 0 0 13px 13px; padding: 16px 20px 18px; }
+  .ih-head { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--fc-line); }
+  .ih-mark { width: 30px; height: 30px; color: var(--fc-accent); flex: none; }
   .ih-brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; line-height: 1.1; }
-  .ih-brand small { display: block; font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ih-text-3); margin-top: 4px; }
-  .ih-for { margin-left: auto; text-align: right; font-size: 12px; color: var(--ih-text-2); }
-  .ih-for span { display: block; font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ih-text-3); margin-bottom: 4px; }
+  .ih-brand small { display: block; font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--fc-text-3); margin-top: 4px; }
+  .ih-for { margin-left: auto; text-align: right; font-size: 12px; color: var(--fc-text-2); }
+  .ih-for span { display: block; font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--fc-text-3); margin-bottom: 4px; }
   .ih-body { padding-top: 16px; display: flex; flex-direction: column; gap: 14px; animation: rise .3s ease both; }
-  .ih h3 { font-size: 17px; font-weight: 650; color: var(--ih-text); }
-  .ih .lead { color: var(--ih-text-2); }
-  .ih .lead b { color: var(--ih-text); font-weight: 600; }
-  .ih .lead a { color: var(--ih-accent); }
-  .ih label { display: block; font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ih-text-3); margin-bottom: 6px; }
-  .ih input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--ih-line); background: var(--ih-surface); color: var(--ih-text); font: 15px var(--font); }
-  .ih input:focus { outline: 2px solid var(--ih-accent); outline-offset: -1px; border-color: transparent; }
+  .ih h3 { font-size: 17px; font-weight: 650; color: var(--fc-text); }
+  .ih .lead { color: var(--fc-text-2); }
+  .ih .lead b { color: var(--fc-text); font-weight: 600; }
+  .ih .lead a { color: var(--fc-accent); }
+  .ih label { display: block; font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--fc-text-3); margin-bottom: 6px; }
+  .ih input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--fc-line); background: var(--fc-surface); color: var(--fc-text); font: 15px var(--font); }
+  .ih input:focus { outline: 2px solid var(--fc-accent); outline-offset: -1px; border-color: transparent; }
   .ih .btns { display: flex; flex-direction: column; gap: 9px; }
   .ih button { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 16px; border: 0; border-radius: 10px;
     font: 600 15px var(--font); cursor: pointer; transition: transform .12s ease, filter .12s ease; }
   .ih button:active { transform: scale(.99); }
-  .ih button.primary { background: var(--ih-accent); color: #0a0c10; }
+  .ih button.primary { background: var(--fc-accent); color: #0a0c10; }
   .ih button.primary:hover { filter: brightness(1.08); }
-  .ih button.secondary { background: transparent; color: var(--ih-text); border: 1px solid var(--ih-line); }
-  .ih button.secondary:hover { background: var(--ih-raised); }
+  .ih button.secondary { background: transparent; color: var(--fc-text); border: 1px solid var(--fc-line); }
+  .ih button.secondary:hover { background: var(--fc-raised); }
   .ih button:disabled { opacity: .5; cursor: default; }
-  .ih .fine { color: var(--ih-text-3); font-size: 12px; }
-  .ih .foot { display: flex; gap: 8px; align-items: center; color: var(--ih-text-3); font-size: 11.5px; padding-top: 12px; border-top: 1px solid var(--ih-line); }
+  .ih .fine { color: var(--fc-text-3); font-size: 12px; }
+  .ih .foot { display: flex; gap: 8px; align-items: center; color: var(--fc-text-3); font-size: 11.5px; padding-top: 12px; border-top: 1px solid var(--fc-line); }
   .ih .foot svg { width: 14px; height: 14px; flex: none; }
-  .ih .foot .mode { margin-left: auto; font: 600 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ih-bad); }
-  .ih .dim { color: var(--ih-text-3); }
+  .ih .foot .mode { margin-left: auto; font: 600 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--fc-bad); }
+  .ih .dim { color: var(--fc-text-3); }
 
   /* Widget: waiting */
-  .ih .scan { position: relative; height: 3px; border-radius: 2px; background: var(--ih-line); overflow: hidden; }
-  .ih .scan::after { content: ""; position: absolute; inset: 0; width: 34%; border-radius: 2px; background: var(--ih-accent); animation: slide 1.5s cubic-bezier(.4,0,.6,1) infinite; }
+  .ih .scan { position: relative; height: 3px; border-radius: 2px; background: var(--fc-line); overflow: hidden; }
+  .ih .scan::after { content: ""; position: absolute; inset: 0; width: 34%; border-radius: 2px; background: var(--fc-accent); animation: slide 1.5s cubic-bezier(.4,0,.6,1) infinite; }
   .ih .waithead { display: flex; align-items: center; gap: 12px; }
-  .ih .ring { width: 40px; height: 40px; border-radius: 50%; border: 2.5px solid var(--ih-accent-soft); border-top-color: var(--ih-accent); animation: spin 1.1s linear infinite; flex: none; }
+  .ih .ring { width: 40px; height: 40px; border-radius: 50%; border: 2.5px solid var(--fc-accent-soft); border-top-color: var(--fc-accent); animation: spin 1.1s linear infinite; flex: none; }
   .ih .how { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .ih .how li { display: flex; gap: 10px; align-items: baseline; color: var(--ih-text-2); }
-  .ih .how li i { font: 600 10px/19px var(--mono); width: 19px; height: 19px; border-radius: 50%; border: 1px solid var(--ih-line); text-align: center; color: var(--ih-text-3); flex: none; font-style: normal; }
-  .ih .how li b { color: var(--ih-text); font-weight: 600; }
-  .ih .kv { display: flex; justify-content: space-between; gap: 12px; font: 12px var(--mono); color: var(--ih-text-3); flex-wrap: wrap; }
-  .ih .kv b { color: var(--ih-text-2); font-weight: 500; }
+  .ih .how li { display: flex; gap: 10px; align-items: baseline; color: var(--fc-text-2); }
+  .ih .how li i { font: 600 10px/19px var(--mono); width: 19px; height: 19px; border-radius: 50%; border: 1px solid var(--fc-line); text-align: center; color: var(--fc-text-3); flex: none; font-style: normal; }
+  .ih .how li b { color: var(--fc-text); font-weight: 600; }
+  .ih .kv { display: flex; justify-content: space-between; gap: 12px; font: 12px var(--mono); color: var(--fc-text-3); flex-wrap: wrap; }
+  .ih .kv b { color: var(--fc-text-2); font-weight: 500; }
 
   /* Widget: verdict */
   .ih .vhead { display: flex; gap: 14px; align-items: center; }
   .ih .vmark { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; flex: none; animation: pop .5s cubic-bezier(.2,.8,.2,1) both; }
   .ih .vmark svg { width: 26px; height: 26px; }
   .ih .vmark path { stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .45s .2s ease forwards; }
-  .ih .vmark.ok { background: var(--ih-ok-soft); color: var(--ih-ok); box-shadow: 0 0 0 1px rgba(53,212,154,.35), 0 0 36px -6px rgba(53,212,154,.45); }
-  .ih .vmark.bad { background: var(--ih-bad-soft); color: var(--ih-bad); box-shadow: 0 0 0 1px rgba(255,93,93,.35), 0 0 36px -6px rgba(255,93,93,.45); }
-  .ih .vmark.warn { background: var(--ih-warn-soft); color: var(--ih-warn); box-shadow: 0 0 0 1px rgba(255,181,71,.35), 0 0 36px -6px rgba(255,181,71,.45); }
+  .ih .vmark.ok { background: var(--fc-ok-soft); color: var(--fc-ok); box-shadow: 0 0 0 1px rgba(53,212,154,.35), 0 0 36px -6px rgba(53,212,154,.45); }
+  .ih .vmark.bad { background: var(--fc-bad-soft); color: var(--fc-bad); box-shadow: 0 0 0 1px rgba(255,93,93,.35), 0 0 36px -6px rgba(255,93,93,.45); }
+  .ih .vmark.warn { background: var(--fc-warn-soft); color: var(--fc-warn); box-shadow: 0 0 0 1px rgba(255,181,71,.35), 0 0 36px -6px rgba(255,181,71,.45); }
   .ih .vhead h3 { font-size: 19px; }
-  .ih .vhead h3.ok { color: var(--ih-ok); } .ih .vhead h3.bad { color: var(--ih-bad); } .ih .vhead h3.warn { color: var(--ih-warn); }
-  .ih .vhead p { color: var(--ih-text-2); margin-top: 3px; }
-  .ih .selfie { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex: none; margin-left: auto; border: 2px solid var(--ih-line); background: var(--ih-raised); }
-  .ih .evidence { display: grid; gap: 1px; background: var(--ih-line); border: 1px solid var(--ih-line); border-radius: 10px; overflow: hidden; }
-  .ih .ev { display: grid; grid-template-columns: 9px 108px 1fr; gap: 10px; align-items: baseline; padding: 9px 12px; background: var(--ih-surface); }
-  .ih .ev i { width: 8px; height: 8px; border-radius: 50%; background: var(--ih-text-3); align-self: center; }
-  .ih .ev i.green { background: var(--ih-ok); } .ih .ev i.red { background: var(--ih-bad); } .ih .ev i.yellow { background: var(--ih-warn); }
-  .ih .ev .n { font: 600 10.5px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ih-text-3); }
+  .ih .vhead h3.ok { color: var(--fc-ok); } .ih .vhead h3.bad { color: var(--fc-bad); } .ih .vhead h3.warn { color: var(--fc-warn); }
+  .ih .vhead p { color: var(--fc-text-2); margin-top: 3px; }
+  .ih .selfie { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex: none; margin-left: auto; border: 2px solid var(--fc-line); background: var(--fc-raised); }
+  .ih .evidence { display: grid; gap: 1px; background: var(--fc-line); border: 1px solid var(--fc-line); border-radius: 10px; overflow: hidden; }
+  .ih .ev { display: grid; grid-template-columns: 9px 108px 1fr; gap: 10px; align-items: baseline; padding: 9px 12px; background: var(--fc-surface); }
+  .ih .ev i { width: 8px; height: 8px; border-radius: 50%; background: var(--fc-text-3); align-self: center; }
+  .ih .ev i.green { background: var(--fc-ok); } .ih .ev i.red { background: var(--fc-bad); } .ih .ev i.yellow { background: var(--fc-warn); }
+  .ih .ev .n { font: 600 10.5px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--fc-text-3); }
   .ih .ev .h { font-weight: 600; font-size: 13px; }
-  .ih .ev .h.red { color: var(--ih-bad); }
-  .ih .ev .d { font-size: 11.5px; color: var(--ih-text-3); margin-top: 1px; }
+  .ih .ev .h.red { color: var(--fc-bad); }
+  .ih .ev .d { font-size: 11.5px; color: var(--fc-text-3); margin-top: 1px; }
   .ih .links { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 13px; }
-  .ih .links a { color: var(--ih-accent); text-decoration: none; font-weight: 600; }
+  .ih .links a { color: var(--fc-accent); text-decoration: none; font-weight: 600; }
   .ih .links a:hover { text-decoration: underline; }
-  .ih .links button.text { width: auto; padding: 0; background: none; border: 0; color: var(--ih-text-2); font: 500 13px var(--font); margin-left: auto; }
-  .ih .links button.text:hover { color: var(--ih-text); }
-  .ih .tech { font: 11.5px/1.5 var(--mono); color: var(--ih-text-3); overflow-wrap: anywhere; }
+  .ih .links button.text { width: auto; padding: 0; background: none; border: 0; color: var(--fc-text-2); font: 500 13px var(--font); margin-left: auto; }
+  .ih .links button.text:hover { color: var(--fc-text); }
+  .ih .tech { font: 11.5px/1.5 var(--mono); color: var(--fc-text-3); overflow-wrap: anywhere; }
   .ih .tech b { font-weight: 600; letter-spacing: .06em; text-transform: uppercase; font-size: 10px; margin-right: 6px; }
-  .ih .err { padding: 12px 14px; border-radius: 10px; background: var(--ih-bad-soft); color: var(--ih-bad); border: 1px solid rgba(255,93,93,.3); }
+  .ih .err { padding: 12px 14px; border-radius: 10px; background: var(--fc-bad-soft); color: var(--fc-bad); border: 1px solid rgba(255,93,93,.3); }
   .ih .err b { display: block; margin-bottom: 2px; }
-  .ih .err span { color: var(--ih-text-2); }
+  .ih .err span { color: var(--fc-text-2); }
 
   footer.foot { border-top: 1px solid var(--line); color: var(--faint); font-size: 12px; padding: 18px 0 28px; }
   footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
@@ -329,7 +329,7 @@
           <li><time>09:41:07</time><span class="dot"></span><div><b>Wire created</b><div class="d">Finance operations · A. Chen</div></div></li>
           <li><time>09:41:52</time><span class="dot"></span><div><b>Beneficiary added</b><div class="d">Kestrel Holdings (HK) Limited · first payment to this account</div></div></li>
           <li><time>09:52:30</time><span class="dot ok"></span><div><b>Reviewed under dual control</b><div class="d">M. Okafor · 4 risk flags acknowledged</div></div></li>
-          <li><time>09:52:31</time><span class="dot warn"></span><div><b>Step-up verification required</b><div class="d">Policy: wires above $1,000,000 need a live-person check of the approver (InHuman)</div></div></li>
+          <li><time>09:52:31</time><span class="dot warn"></span><div><b>Step-up verification required</b><div class="d">Policy: wires above $1,000,000 need a live-person check of the approver (FaceCheck)</div></div></li>
         </ol>
       </section>
     </div>
@@ -343,7 +343,7 @@
         <div class="ih" id="ih" aria-live="polite">
           <div class="ih-head">
             <svg class="ih-mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z" fill="currentColor" opacity=".16"/><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="m17 24 5 5 9-10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <div class="ih-brand">InHuman<small>Live-person check</small></div>
+            <div class="ih-brand">FaceCheck<small>Live-person check</small></div>
             <div class="ih-for"><span>Verifying for</span>Northwind Business</div>
           </div>
           <div class="ih-body" id="ihBody"></div>
@@ -378,10 +378,10 @@ const APP_NAME = "Northwind Business";
 const AMOUNT = "$25,600,000.00";
 const PASS_MARK = 0.35;                 // server: verdict.THRESHOLDS.face_similarity_min (also sent back as face_pass_mark)
 const PARAMS = new URLSearchParams(location.search);
-// ?inject[=port] on this page is passed on to the InHuman tab (attack demo: its camera becomes the live face swap).
+// ?inject[=port] on this page is passed on to the FaceCheck tab (attack demo: its camera becomes the live face swap).
 const INJECT = PARAMS.has("inject") ? (PARAMS.get("inject") || "") : null;
 
-const S = { state: "idle", req: null, user: PARAMS.get("user") || localStorage.getItem("inhuman.user") || "daniel",
+const S = { state: "idle", req: null, user: PARAMS.get("user") || localStorage.getItem("facecheck.user") || "daniel",
             poll: null, clock: null, startedAt: 0, busy: false };
 
 async function api(path, opts) {
@@ -395,7 +395,7 @@ function appUrl(req) {
   return u;
 }
 
-// ---------- copy: the server's reason -> plain English (same table as the InHuman results page) ----------
+// ---------- copy: the server's reason -> plain English (same table as the FaceCheck results page) ----------
 // [substring of the server's reason, full sentence, short label]. First match wins, so specific keys come first.
 const COPY = [
   ["live human, matching", "A live person, and the enrolled approver.", "Live, and the enrolled approver"],
@@ -419,7 +419,7 @@ const COPY = [
   ["selfie does not match", "The selfie doesn't match the enrolled approver's face.", "Not the enrolled approver"],
   ["no selfie uploaded", "No selfie came with this check, so there was no face to compare.", "No selfie to compare"],
   ["no face found in the selfie", "No face was found in the selfie.", "No face in the selfie"],
-  ["not enrolled", "This account hasn't enrolled a face with InHuman yet.", "Not enrolled"],
+  ["not enrolled", "This account hasn't enrolled a face with FaceCheck yet.", "Not enrolled"],
   ["ambient light", "The room is too bright for the screen's light to show on the face. Try somewhere dimmer.", "Room too bright"],
   ["too few frames", "The camera didn't deliver enough frames during the flashes.", "Too few camera frames"],
   ["dropped camera frames", "Too many camera frames were dropped during the check.", "Too many dropped frames"],
@@ -443,13 +443,13 @@ const ICON = {
   phone: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>`,
 };
 
-// What InHuman says, and what the bank does about it.
+// What FaceCheck says, and what the bank does about it.
 const VERDICT = {
   verified:     { tone: "ok",   title: "Live human verified", outcome: "Wire released",
                   note: "A live person matching the enrolled approver confirmed this transfer. Queued for SWIFT release; Finance operations notified.",
                   chip: "Released", step: "Live person confirmed", release: "Queued for SWIFT" },
   unverified:   { tone: "bad",  title: "Not a live human", outcome: "Transfer blocked",
-                  note: "InHuman could not confirm a live human at the camera. The wire is held, Security has been notified, and the CFO is being called back on a known number.",
+                  note: "FaceCheck could not confirm a live human at the camera. The wire is held, Security has been notified, and the CFO is being called back on a known number.",
                   chip: "Blocked", step: "Not a live person", release: "Held for Security review" },
   unverifiable: { tone: "warn", title: "Couldn't verify", outcome: "Approval not recorded",
                   note: "The check couldn't be completed, so nothing was approved. Try again closer to the screen, in a dimmer room, with the brightness up.",
@@ -467,7 +467,7 @@ function setStage(state) {
   chip.className = `chip ${tone}`;
   chip.textContent = text;
   $("stepApprove").className = { pending: "active", verified: "done", unverified: "failed", denied: "failed", unverifiable: "hold", rejected: "failed" }[state] || "current";
-  $("stepApproveSub").textContent = v ? v.step : { pending: "InHuman check in progress", rejected: "Rejected by you" }[state] || "You · live-person check";
+  $("stepApproveSub").textContent = v ? v.step : { pending: "FaceCheck check in progress", rejected: "Rejected by you" }[state] || "You · live-person check";
   $("stepRelease").className = state === "verified" ? "done" : "";
   $("stepReleaseSub").textContent = v ? v.release : "SWIFT · before 17:00 ET";
 }
@@ -478,7 +478,7 @@ function logEntry(tone, title, detailHtml) {
   $("log").appendChild(li);
 }
 
-// ---------- the InHuman widget ----------
+// ---------- the FaceCheck widget ----------
 
 const user = () => (S.user || "daniel").trim() || "daniel";
 function body(html) { $("ihBody").innerHTML = html; }
@@ -487,7 +487,7 @@ function renderIdle(note) {
   S.state = "idle";
   body(`
     <div><h3>Prove a live human is approving</h3>
-      <p class="lead" style="margin-top:4px">Take a selfie, then lean in while the screen flashes a random pattern. InHuman reads the light on your skin and the pattern's reflection in your eye. <b>About ten seconds.</b></p></div>
+      <p class="lead" style="margin-top:4px">Take a selfie, then lean in while the screen flashes a random pattern. FaceCheck reads the light on your skin and the pattern's reflection in your eye. <b>About ten seconds.</b></p></div>
     ${note ? `<div class="err"><b>${esc(note.title)}</b><span>${esc(note.detail)}</span></div>` : ""}
     <div><label for="user">Approving as</label><input id="user" value="${esc(user())}" autocomplete="off" spellcheck="false" autocapitalize="off"></div>
     <div class="btns">
@@ -497,7 +497,7 @@ function renderIdle(note) {
     <p class="fine">Sit close, screen brightness all the way up, dim room. The check stops if you leave the tab.</p>
     <div class="foot">${ICON.lock}<span>Evidence is stored with this approval</span>${INJECT !== null ? `<span class="mode">Test: injected camera</span>` : ""}</div>`);
   const inp = $("user");
-  inp.addEventListener("input", () => { S.user = inp.value; localStorage.setItem("inhuman.user", user()); });
+  inp.addEventListener("input", () => { S.user = inp.value; localStorage.setItem("facecheck.user", user()); });
   $("goWeb").onclick = () => signIn("web");
   $("goPhone").onclick = () => signIn("phone");
 }
@@ -508,8 +508,8 @@ function renderPending(req) {
   body(`
     <div class="waithead"><div class="ring"></div>
       <div><h3>${web ? "Check in progress" : "Sent to your phone"}</h3>
-        <p class="lead" style="margin-top:2px">${web ? `Finish it in the InHuman tab. If it didn't open, <a href="${esc(appUrl(req))}" target="_blank" rel="noopener">open it here</a>.`
-                                                    : `Open InHuman on your phone and approve the request from ${esc(APP_NAME)}.`}</p></div></div>
+        <p class="lead" style="margin-top:2px">${web ? `Finish it in the FaceCheck tab. If it didn't open, <a href="${esc(appUrl(req))}" target="_blank" rel="noopener">open it here</a>.`
+                                                    : `Open FaceCheck on your phone and approve the request from ${esc(APP_NAME)}.`}</p></div></div>
     <div class="scan" aria-hidden="true"></div>
     <ol class="how">
       <li><i>1</i><span><b>Selfie</b> <span class="dim">· matched against the enrolled face</span></span></li>
@@ -562,7 +562,7 @@ function renderDecision(req) {
   const box = $("decision");
   box.className = `card decision ${v.tone}`;
 
-  // What face recognition alone would have concluded, next to what InHuman concluded.
+  // What face recognition alone would have concluded, next to what FaceCheck concluded.
   let versus = "", strip = "";
   const sim = fin(r.face_similarity);
   if (sim != null) {
@@ -580,14 +580,14 @@ function renderDecision(req) {
       </div>
       <div class="vs" aria-hidden="true">VS</div>
       <div class="cell ours ${v.tone}">
-        <div class="eyebrow">InHuman live-person check</div>
+        <div class="eyebrow">FaceCheck live-person check</div>
         <div class="big">${esc(v.outcome)}</div>
         <div class="sm">${esc(v.tone === "ok" ? "A live person, and the enrolled approver." : friendlyShort(r.reason))}</div>
         <div class="say ${v.tone}">${ICON[v.tone]}${esc(v.tone === "ok" ? "Live human confirmed" : v.tone === "bad" ? `${AMOUNT} stays in the account` : "Nothing moved")}</div>
       </div></div>`;
     if (ok && facePass) strip = `<div class="strip ok">${ICON.ok}<span>Both agree: this is the enrolled approver, and they are live.</span></div>`;
-    else if (facePass && v.tone === "bad") strip = `<div class="strip bad">${ICON.warn}<span>Face recognition was fooled at ${fix2(sim)}. InHuman caught it.</span></div>`;
-    else if (facePass) strip = `<div class="strip warn">${ICON.warn}<span>Face recognition would approve. InHuman won't until it sees proof of a live person.</span></div>`;
+    else if (facePass && v.tone === "bad") strip = `<div class="strip bad">${ICON.warn}<span>Face recognition was fooled at ${fix2(sim)}. FaceCheck caught it.</span></div>`;
+    else if (facePass) strip = `<div class="strip warn">${ICON.warn}<span>Face recognition would approve. FaceCheck won't until it sees proof of a live person.</span></div>`;
     else strip = `<div class="strip flat"><span>Both reject: the selfie doesn't match the enrolled approver.</span></div>`;
   }
   box.innerHTML = `<div class="top"><div class="glyph">${ICON[v.tone]}</div><div><h2>${esc(v.outcome)}</h2><p>${esc(v.note)}</p></div></div>${versus}${strip}`;
@@ -602,13 +602,13 @@ async function signIn(device) {
   if (S.busy) return;
   S.busy = true;
   // Open the tab inside the click, before any await, or the pop-up blocker eats it.
-  const tab = device === "web" ? window.open("about:blank", "inhuman") : null;
+  const tab = device === "web" ? window.open("about:blank", "facecheck") : null;
   const u = user();
   try {
     const enrolled = (await api(`/users/${encodeURIComponent(u)}`)).enrolled;
     if (!enrolled) {
       if (tab) tab.location = `/app/?user=${encodeURIComponent(u)}`;
-      renderIdle({ title: `“${u}” hasn't enrolled with InHuman yet`, detail: `Enroll a face once in the InHuman app${tab ? " (it just opened in a new tab)" : ""}, then come back and verify.` });
+      renderIdle({ title: `“${u}” hasn't enrolled with FaceCheck yet`, detail: `Enroll a face once in the FaceCheck app${tab ? " (it just opened in a new tab)" : ""}, then come back and verify.` });
       return;
     }
     const req = await api("/auth/requests", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -617,7 +617,7 @@ async function signIn(device) {
     watch(req);
   } catch (e) {
     if (tab) tab.close();
-    renderIdle({ title: "Couldn't start the check", detail: `${e.message}. Is the InHuman server running?` });
+    renderIdle({ title: "Couldn't start the check", detail: `${e.message}. Is the FaceCheck server running?` });
   } finally { S.busy = false; }
 }
 
@@ -627,7 +627,7 @@ function watch(req) {
   S.startedAt = Date.now();
   setStage("pending");
   $("decision").hidden = true;
-  logEntry("info", "Step-up verification requested", `InHuman · request <code>${esc(req.id)}</code> · ${req.device === "web" ? "this computer's camera" : "phone"}`);
+  logEntry("info", "Step-up verification requested", `FaceCheck · request <code>${esc(req.id)}</code> · ${req.device === "web" ? "this computer's camera" : "phone"}`);
   renderPending(req);
   S.clock = setInterval(() => {
     const s = Math.floor((Date.now() - S.startedAt) / 1000), el = $("elapsed");
@@ -640,7 +640,7 @@ function watch(req) {
       misses = 0;
       if (r.status !== "pending") { stopWatching(); finish(r); }
     } catch (e) {
-      if (++misses === 8) logEntry("warn", "Lost contact with the InHuman server", "Still trying…");
+      if (++misses === 8) logEntry("warn", "Lost contact with the FaceCheck server", "Still trying…");
     }
   }, 1000);
 }
@@ -654,7 +654,7 @@ function finish(req) {
   renderDone(req);
   renderDecision(req);
   const sim = fin(r.face_similarity);
-  logEntry(v.tone, `InHuman verdict: ${v.title.toLowerCase()}`,
+  logEntry(v.tone, `FaceCheck verdict: ${v.title.toLowerCase()}`,
     `${esc(friendlyShort(r.reason) || "")}${sim != null ? ` · face match ${fix2(sim)}` : ""}${r.capture ? ` · evidence <code>${esc(r.capture)}</code>` : ""}`);
   logEntry(v.tone, v.outcome, esc(v.tone === "ok" ? "Queued for SWIFT release" : v.tone === "bad" ? "Security notified; funds held" : "Nothing approved; try again"));
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -692,7 +692,7 @@ $("reject").onclick = () => {
 
 // ---------- replays and resumes ----------
 
-/** ?replay=<capture folder>: show a saved check's outcome without running one (same as the InHuman app's ?replay). */
+/** ?replay=<capture folder>: show a saved check's outcome without running one (same as the FaceCheck app's ?replay). */
 async function replay(name) {
   const r = await api(`/captures/${encodeURIComponent(name)}/result.json`);
   const sim = ((r.signals || {}).identity || {}).similarity;

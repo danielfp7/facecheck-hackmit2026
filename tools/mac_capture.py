@@ -34,7 +34,7 @@ sys.path.insert(0, str(SERVER_DIR / "tests"))
 import challenge as challenge_mod  # noqa: E402
 from render import render_color, render_state  # noqa: E402
 
-WIN = "InHuman challenge"
+WIN = "FaceCheck challenge"
 
 
 def builtin_camera() -> int:

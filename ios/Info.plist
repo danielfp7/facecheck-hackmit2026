@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>InHuman</string>
+	<string>FaceCheck</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -30,9 +30,9 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>InHuman films your face and eye while the screen flashes, to prove a live person is present.</string>
+	<string>FaceCheck films your face and eye while the screen flashes, to prove a live person is present.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>InHuman sends the capture to the verification server on your local network.</string>
+	<string>FaceCheck sends the capture to the verification server on your local network.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>

@@ -93,7 +93,7 @@ struct API {
 }
 
 struct Multipart {
-    private let boundary = "inhuman-\(UUID().uuidString)"
+    private let boundary = "facecheck-\(UUID().uuidString)"
     private var body = Data()
 
     mutating func field(_ name: String, _ value: String) {

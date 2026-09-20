@@ -1,5 +1,5 @@
-/* InHuman design tokens. One look everywhere: dark, minimal, instrument-like.
-   Every InHuman surface (app shell, camera HUD, results, the panel embedded in a relying
+/* FaceCheck design tokens. One look everywhere: dark, minimal, instrument-like.
+   Every FaceCheck surface (app shell, camera HUD, results, the panel embedded in a relying
    party's page) reads these; nothing hard-codes a colour. */
 :root {
   --bg: #0a0c10;            /* page */

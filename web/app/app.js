@@ -1,4 +1,4 @@
-// InHuman web client: the same verification flow as the iPhone app, on a computer's webcam.
+// FaceCheck web client: the same verification flow as the iPhone app, on a computer's webcam.
 //
 // Differences a browser forces on us, and how the server copes:
 //  - No video file with exact per-frame timestamps: each camera frame is grabbed with its
@@ -247,7 +247,7 @@ const STEADY_PX = 22;               // allowed movement while holding, in video 
 const AUTO_MAX_DIST_MM = 230;       // start the flashes at or inside this
 const NUDGE_DIST_MM = 300;          // beyond this, ask them to come closer
 
-function trackerReady() { return !!(window.InHumanTracker && S.tracker.ready); }
+function trackerReady() { return !!(window.FaceCheckTracker && S.tracker.ready); }
 
 function stopTracking() {
   const T = S.tracker;
@@ -288,7 +288,7 @@ function startTracking(phase) {
   const tick = () => {
     if (!T.on || S.step !== "camera") return;
     let r = null;
-    try { r = window.InHumanTracker.track(video, video.videoWidth, video.videoHeight); }
+    try { r = window.FaceCheckTracker.track(video, video.videoWidth, video.videoHeight); }
     catch { /* a bad frame is not a failure */ }
     const t = now();
     if (r) {
@@ -357,7 +357,7 @@ function startTracking(phase) {
 function trackFrame() {
   if (!trackerReady()) return null;
   try {
-    const r = window.InHumanTracker.track(video, video.videoWidth, video.videoHeight);
+    const r = window.FaceCheckTracker.track(video, video.videoWidth, video.videoHeight);
     return r ? [Math.round(r.eye.x), Math.round(r.eye.y), Math.round(r.eye.r * 10) / 10] : null;
   } catch { return null; }
 }
@@ -428,11 +428,11 @@ async function ready() {
     // Fullscreen needs the click's user activation, so ask now, before the countdown.
     await document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
     S.challenge = await api("/challenge", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-    const cd = $("countdown");
+    const cd = $("countdown"), cdNum = $("countdownNum");
     cd.hidden = false;
     for (let n = 3; n >= 1; n--) {
-      cd.textContent = n;
-      await sleep(0.8);
+      cdNum.textContent = n;
+      await sleep(0.9);
       if (S.step !== "camera") return;
     }
     cd.hidden = true;
@@ -562,11 +562,11 @@ function reset() {
   setTimeout(() => (S.aborted = null), 0);
   // Load the face tracker in the background. Everything works without it.
 (function initTracker() {
-  const go = () => window.InHumanTracker.init()
+  const go = () => window.FaceCheckTracker.init()
     .then(() => { S.tracker.ready = true; })
     .catch(() => { S.tracker.ready = false; });
-  if (window.InHumanTracker) go();
-  else addEventListener("inhuman-tracker-loaded", go, { once: true });
+  if (window.FaceCheckTracker) go();
+  else addEventListener("facecheck-tracker-loaded", go, { once: true });
 })();
 
 show("home");
@@ -575,8 +575,8 @@ show("home");
 // ---------- wiring ----------
 
 const params = new URLSearchParams(location.search);
-$("user").value = params.get("user") || localStorage.getItem("inhuman.user") || "daniel";
-$("user").addEventListener("change", () => { localStorage.setItem("inhuman.user", user()); poll(); });
+$("user").value = params.get("user") || localStorage.getItem("facecheck.user") || "daniel";
+$("user").addEventListener("change", () => { localStorage.setItem("facecheck.user", user()); poll(); });
 if (INJECT) { $("injectNote").hidden = false; $("label").value = "inject-attack"; }
 $("btnEnroll").onclick = () => begin(true);
 $("btnTest").onclick = () => { S.request = null; show("warning"); };
@@ -624,11 +624,11 @@ async function openReplay() {
 
 // Load the face tracker in the background. Everything works without it.
 (function initTracker() {
-  const go = () => window.InHumanTracker.init()
+  const go = () => window.FaceCheckTracker.init()
     .then(() => { S.tracker.ready = true; })
     .catch(() => { S.tracker.ready = false; });
-  if (window.InHumanTracker) go();
-  else addEventListener("inhuman-tracker-loaded", go, { once: true });
+  if (window.FaceCheckTracker) go();
+  else addEventListener("facecheck-tracker-loaded", go, { once: true });
 })();
 
 show("home");

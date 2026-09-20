@@ -43,7 +43,7 @@ struct ResultsView: View {
 
     private var header: some View {
         HStack {
-            Text("InHuman · report").dataLabel()
+            Text("FaceCheck · report").dataLabel()
             Spacer()
             Text(flow.label).dataLabel(.ihText3, size: 10)
         }
@@ -108,7 +108,7 @@ struct VerdictBanner: View {
 }
 
 /// The pitch, in one tile: what a face-recognition-only login would have decided.
-/// A live face swap scores far above the 0.35 pass mark, so this is where InHuman earns its keep.
+/// A live face swap scores far above the 0.35 pass mark, so this is where FaceCheck earns its keep.
 struct FaceRecognitionOnlyTile: View {
     let similarity: Double?
     let verdict: String
@@ -192,7 +192,7 @@ struct FaceRecognitionOnlyTile: View {
             HStack(alignment: .top, spacing: 12) {
                 comparison("Face recognition", faceVerdict, similarity == nil ? .ihText2 : tint)
                 Rectangle().fill(Color.ihLine).frame(width: 1, height: 34)
-                comparison("InHuman", inhumanVerdict, Color.ihStatus(verdictStatus(verdict)))
+                comparison("FaceCheck", inhumanVerdict, Color.ihStatus(verdictStatus(verdict)))
             }
             Text("A deepfake is built to pass face recognition. These checks are what it can't fake.")
                 .font(.system(size: 12))

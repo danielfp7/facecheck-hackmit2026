@@ -6,7 +6,7 @@
 //   - the true distance to the camera, from the iris as a ruler (irises are ~11.7 mm in everyone)
 //   - a face box, so the selfie can take itself when the face is framed and still
 //
-// app.js is a plain script, so the API hangs off window.InHumanTracker. Everything that uses
+// app.js is a plain script, so the API hangs off window.FaceCheckTracker. Everything that uses
 // it must cope with it being absent: tracking is an upgrade, never a requirement.
 
 import { FaceLandmarker, FilesetResolver } from "./vendor/mediapipe/vision_bundle.mjs";
@@ -76,5 +76,5 @@ function track(source, w, h, tsMs) {
   };
 }
 
-window.InHumanTracker = { init, track };
-window.dispatchEvent(new Event("inhuman-tracker-loaded"));
+window.FaceCheckTracker = { init, track };
+window.dispatchEvent(new Event("facecheck-tracker-loaded"));

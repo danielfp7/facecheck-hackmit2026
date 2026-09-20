@@ -4,7 +4,7 @@
 //
 // Layout built inside #results .resultsWrap (index.html owns the markup, this file fills it):
 //   #verdict   hero: drawn check/cross, verdict, plain-English reason, "Analyzed in X s" (#timing moves here)
-//   .compare   "face recognition alone" vs "InHuman" strip (created here, before #tiles)
+//   .compare   "face recognition alone" vs "FaceCheck" strip (created here, before #tiles)
 //   #tiles     one evidence card per r.tiles entry, enriched by name from r.signals
 //   #btnDone   kept last; app.js owns its click handler
 (function () {
@@ -98,7 +98,7 @@
     badge.querySelector(".badgeMark").setAttribute("transform", "translate(12 12)");
     v.append(
       h("div", "badgeWrap", badge),
-      h("div", "label heroKicker", "InHuman · liveness check"),
+      h("div", "label heroKicker", "FaceCheck · liveness check"),
       h("h2", "heroTitle", TITLE[verdict]),
       h("p", "heroReason", sentence(r.reason) || FALLBACK_REASON[verdict]),
     );
@@ -114,7 +114,7 @@
     v.append(timing);
   }
 
-  // ---------- 2. face recognition alone vs InHuman ----------
+  // ---------- 2. face recognition alone vs FaceCheck ----------
   function gauge(value, tone) {
     const g = h("div", "gauge");
     const fill = h("div", `fill t-${tone}`);
@@ -157,8 +157,8 @@
       h("div", "line", h("span", `tag t-${leftTag[0]}`, leftTag[1]), h("span", "lineText", leftLine)),
     );
 
-    // right: InHuman
-    const right = h("div", "cell inhuman");
+    // right: FaceCheck
+    const right = h("div", "cell facecheck");
     let rightTag;
     if (verdict === "verified") rightTag = ["ok", "Live human"];
     else if (verdict === "unverified") rightTag = ["ok", mode === "fooled" ? "Caught it" : "Rejected"];
@@ -170,7 +170,7 @@
     else if (verdict === "unverified") rightLine = failed.length ? `${mode === "fooled" ? "Caught by" : "Rejected on"} ${failed.join(" and ")}` : sentence(r.reason);
     else rightLine = unsure.length ? cap(`${unsure.join(" and ")} couldn't be checked`) : sentence(r.reason);
     right.append(
-      h("div", "label", "InHuman"),
+      h("div", "label", "FaceCheck"),
       h("div", `big verdictWord t-${tone}`, TITLE[verdict]),
       h("div", "checkRow", ...tiles.map((t) => { const s = STATUS[t.status] || "warn"; const c = h("span", `chip t-${s}`, h("i", "dot"), t.name); c.title = `${t.name}: ${STATUS_WORD[s]}`; return c; })),
       h("div", "line", h("span", `tag t-${rightTag[0]}`, rightTag[1]), h("span", "lineText", rightLine)),
@@ -178,13 +178,12 @@
 
     // one sentence that says what just happened
     let note;
-    if (mode === "fooled") note = `Face recognition scored this face ${simText} against a ${PASS_MARK} pass mark and would have let them in. InHuman ${verdict === "unverified" ? "rejected it" : "held it back"}: ${lower(sentence(r.reason)) || "a liveness check did not pass."}`;
+    if (mode === "fooled") note = `Face recognition scored this face ${simText} against a ${PASS_MARK} pass mark and would have let them in. FaceCheck ${verdict === "unverified" ? "rejected it" : "held it back"}: ${lower(sentence(r.reason)) || "a liveness check did not pass."}`;
     else if (mode === "agree-pass") note = `Both agree. The selfie matches the enrolled face (${simText} against a ${PASS_MARK} pass mark) and ${unsure.length ? "no liveness check failed" : "every liveness check passed"}.`;
     else if (mode === "agree-fail") note = `Face recognition would have rejected this too: ${simText} against a ${PASS_MARK} pass mark.`;
     else note = `Face recognition had nothing to score${faceTile && faceTile.detail ? ` (${lower(faceTile.detail)})` : ""}, so only the liveness checks count here.`;
 
     strip.append(
-      h("div", "label compareKicker", mode === "fooled" ? "Same video, two answers" : mode === "unknown" ? "One video, two ways to decide" : "Two ways to decide, same answer"),
       left,
       h("div", "vs", h("span", "", mode === "agree-pass" || mode === "agree-fail" ? "=" : "vs")),
       right,

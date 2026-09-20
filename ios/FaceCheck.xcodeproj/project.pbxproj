@@ -7,138 +7,138 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		222EFF042AE889DF44E2A041 /* ChallengeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 630F163BA1DA97A724F6F653 /* ChallengeViewController.swift */; };
-		29C00E74DBD2AFA547AA4EC9 /* Flow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BEED4F02A3E2391A924900C /* Flow.swift */; };
-		45058822DE62D69F659013B3 /* Sensors.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE7BF253907BC42F1EF47A86 /* Sensors.swift */; };
-		7110FEF15961EF73976D7DA4 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF6954751E2F97ECE5DFA4B /* Theme.swift */; };
-		87BE005AF867ED2C42D27924 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0EE1958B73703C638707C96 /* Views.swift */; };
-		9F93CF6799A8127470A34591 /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ABE877C4626F8DF41324823 /* ResultsView.swift */; };
-		A911F6F242E7B3B9FBBA573D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 009A4C1C4E2476692C6E8F91 /* Models.swift */; };
-		B31E2F2FC572310482C9F76C /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = 647FB18F1791FE824E019B23 /* API.swift */; };
-		D8314275E07E16F4563B5F02 /* CaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CDB81D9A059E48993B15A54 /* CaptureController.swift */; };
+		082C962B2ECBE5F5A1A588CC /* ChallengeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 228CD4EC90AD6BF245E11E8E /* ChallengeViewController.swift */; };
+		31AB3A0C1B6157203AD60D5E /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D5299CE03E48580DA6C0BC /* Views.swift */; };
+		4B0328D9C7CB4BB48322C079 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E3F68DBEE7EB8D3BE8CD69B /* Models.swift */; };
+		8C241B88AAB1749A2B797231 /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118E10F4198ABB1500A8004E /* API.swift */; };
+		99FAD19FCE086BC7E9968B28 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7293451DD58983565EEF7481 /* Theme.swift */; };
+		A8041FE40B76FCE2362316E5 /* Sensors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1799759D73FEDED4C4493016 /* Sensors.swift */; };
+		B2AB671168B40DBF510AECE7 /* CaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A920424C432AE751A512BB8 /* CaptureController.swift */; };
+		B48E11AB5A29A73FA2CE352F /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8088F66AE7F70777E273F45C /* ResultsView.swift */; };
+		D71752A38B8276B4E942DE65 /* Flow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2711F46AFB7D0403C6E523D8 /* Flow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		009A4C1C4E2476692C6E8F91 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		1BEED4F02A3E2391A924900C /* Flow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Flow.swift; sourceTree = "<group>"; };
-		2EF6954751E2F97ECE5DFA4B /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		4ABE877C4626F8DF41324823 /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
-		630F163BA1DA97A724F6F653 /* ChallengeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeViewController.swift; sourceTree = "<group>"; };
-		647FB18F1791FE824E019B23 /* API.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API.swift; sourceTree = "<group>"; };
-		6CDB81D9A059E48993B15A54 /* CaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureController.swift; sourceTree = "<group>"; };
-		AAD231A17F77C459C84022D0 /* InHuman.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = InHuman.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C0EE1958B73703C638707C96 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views.swift; sourceTree = "<group>"; };
-		EE7BF253907BC42F1EF47A86 /* Sensors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sensors.swift; sourceTree = "<group>"; };
+		0E3F68DBEE7EB8D3BE8CD69B /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		118E10F4198ABB1500A8004E /* API.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API.swift; sourceTree = "<group>"; };
+		1799759D73FEDED4C4493016 /* Sensors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sensors.swift; sourceTree = "<group>"; };
+		228CD4EC90AD6BF245E11E8E /* ChallengeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeViewController.swift; sourceTree = "<group>"; };
+		2711F46AFB7D0403C6E523D8 /* Flow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Flow.swift; sourceTree = "<group>"; };
+		7293451DD58983565EEF7481 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		7A920424C432AE751A512BB8 /* CaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureController.swift; sourceTree = "<group>"; };
+		8088F66AE7F70777E273F45C /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
+		A4D5299CE03E48580DA6C0BC /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views.swift; sourceTree = "<group>"; };
+		FBBD8448FA0CABC8079421F8 /* FaceCheck.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FaceCheck.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
-		2C0FEB48A9B2757D7FC7E390 /* Products */ = {
+		5EBF0A2D358F2C198ACDCA9A = {
 			isa = PBXGroup;
 			children = (
-				AAD231A17F77C459C84022D0 /* InHuman.app */,
+				C0A9D8236EA1CEFF7F6ABA99 /* Sources */,
+				6929B199089F4C09EFB29195 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		6929B199089F4C09EFB29195 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				FBBD8448FA0CABC8079421F8 /* FaceCheck.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		4B0116F64F2FD95B25BBC41F /* Sources */ = {
+		C0A9D8236EA1CEFF7F6ABA99 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				647FB18F1791FE824E019B23 /* API.swift */,
-				6CDB81D9A059E48993B15A54 /* CaptureController.swift */,
-				630F163BA1DA97A724F6F653 /* ChallengeViewController.swift */,
-				1BEED4F02A3E2391A924900C /* Flow.swift */,
-				009A4C1C4E2476692C6E8F91 /* Models.swift */,
-				4ABE877C4626F8DF41324823 /* ResultsView.swift */,
-				EE7BF253907BC42F1EF47A86 /* Sensors.swift */,
-				2EF6954751E2F97ECE5DFA4B /* Theme.swift */,
-				C0EE1958B73703C638707C96 /* Views.swift */,
+				118E10F4198ABB1500A8004E /* API.swift */,
+				7A920424C432AE751A512BB8 /* CaptureController.swift */,
+				228CD4EC90AD6BF245E11E8E /* ChallengeViewController.swift */,
+				2711F46AFB7D0403C6E523D8 /* Flow.swift */,
+				0E3F68DBEE7EB8D3BE8CD69B /* Models.swift */,
+				8088F66AE7F70777E273F45C /* ResultsView.swift */,
+				1799759D73FEDED4C4493016 /* Sensors.swift */,
+				7293451DD58983565EEF7481 /* Theme.swift */,
+				A4D5299CE03E48580DA6C0BC /* Views.swift */,
 			);
 			path = Sources;
-			sourceTree = "<group>";
-		};
-		CB63E8BD553C3004567CB212 = {
-			isa = PBXGroup;
-			children = (
-				4B0116F64F2FD95B25BBC41F /* Sources */,
-				2C0FEB48A9B2757D7FC7E390 /* Products */,
-			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		472075BD4C50AF9CCB4BBA1B /* InHuman */ = {
+		4D5AE0C17F601BD61780F88F /* FaceCheck */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A230CB35BDCFAE06A82F59C1 /* Build configuration list for PBXNativeTarget "InHuman" */;
+			buildConfigurationList = ADB92077C61D56BC92015003 /* Build configuration list for PBXNativeTarget "FaceCheck" */;
 			buildPhases = (
-				B66AC9FB12FA92B255E34CF5 /* Sources */,
+				06ECD46CD687B0B5CAE78858 /* Sources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = InHuman;
+			name = FaceCheck;
 			packageProductDependencies = (
 			);
-			productName = InHuman;
-			productReference = AAD231A17F77C459C84022D0 /* InHuman.app */;
+			productName = FaceCheck;
+			productReference = FBBD8448FA0CABC8079421F8 /* FaceCheck.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		5D1FE04E2689B35A746D7B45 /* Project object */ = {
+		589A78D631D532B0A1165093 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
-					472075BD4C50AF9CCB4BBA1B = {
+					4D5AE0C17F601BD61780F88F = {
 						DevelopmentTeam = 8W48T3S92B;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = 862FE7C6DF5C707EF2873A9F /* Build configuration list for PBXProject "InHuman" */;
+			buildConfigurationList = 58E91D6F37E0EEFCD960B2ED /* Build configuration list for PBXProject "FaceCheck" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
 			);
-			mainGroup = CB63E8BD553C3004567CB212;
+			mainGroup = 5EBF0A2D358F2C198ACDCA9A;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 2C0FEB48A9B2757D7FC7E390 /* Products */;
+			productRefGroup = 6929B199089F4C09EFB29195 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				472075BD4C50AF9CCB4BBA1B /* InHuman */,
+				4D5AE0C17F601BD61780F88F /* FaceCheck */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
-		B66AC9FB12FA92B255E34CF5 /* Sources */ = {
+		06ECD46CD687B0B5CAE78858 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B31E2F2FC572310482C9F76C /* API.swift in Sources */,
-				D8314275E07E16F4563B5F02 /* CaptureController.swift in Sources */,
-				222EFF042AE889DF44E2A041 /* ChallengeViewController.swift in Sources */,
-				29C00E74DBD2AFA547AA4EC9 /* Flow.swift in Sources */,
-				A911F6F242E7B3B9FBBA573D /* Models.swift in Sources */,
-				9F93CF6799A8127470A34591 /* ResultsView.swift in Sources */,
-				45058822DE62D69F659013B3 /* Sensors.swift in Sources */,
-				7110FEF15961EF73976D7DA4 /* Theme.swift in Sources */,
-				87BE005AF867ED2C42D27924 /* Views.swift in Sources */,
+				8C241B88AAB1749A2B797231 /* API.swift in Sources */,
+				B2AB671168B40DBF510AECE7 /* CaptureController.swift in Sources */,
+				082C962B2ECBE5F5A1A588CC /* ChallengeViewController.swift in Sources */,
+				D71752A38B8276B4E942DE65 /* Flow.swift in Sources */,
+				4B0328D9C7CB4BB48322C079 /* Models.swift in Sources */,
+				B48E11AB5A29A73FA2CE352F /* ResultsView.swift in Sources */,
+				A8041FE40B76FCE2362316E5 /* Sensors.swift in Sources */,
+				99FAD19FCE086BC7E9968B28 /* Theme.swift in Sources */,
+				31AB3A0C1B6157203AD60D5E /* Views.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		53C315EB27AF6002136308E6 /* Release */ = {
+		3472CE221CF8AEC96CC209F2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -149,13 +149,13 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.hackmit.inhuman.danielpacheco;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hackmit.facecheck.danielpacheco;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
-			name = Release;
+			name = Debug;
 		};
-		653A061994A16239EBE32673 /* Debug */ = {
+		5998E3A79E86CA9DB6A86588 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -222,7 +222,7 @@
 			};
 			name = Debug;
 		};
-		B055F15F1F64B0E6C09103DD /* Debug */ = {
+		8138912509AF2E0A2922E847 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -233,13 +233,13 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.hackmit.inhuman.danielpacheco;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hackmit.facecheck.danielpacheco;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
-			name = Debug;
+			name = Release;
 		};
-		E7CEE6C4E842E8594672B345 /* Release */ = {
+		BAD2FB6E5155B35F1A08D22B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -302,25 +302,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		862FE7C6DF5C707EF2873A9F /* Build configuration list for PBXProject "InHuman" */ = {
+		58E91D6F37E0EEFCD960B2ED /* Build configuration list for PBXProject "FaceCheck" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				653A061994A16239EBE32673 /* Debug */,
-				E7CEE6C4E842E8594672B345 /* Release */,
+				5998E3A79E86CA9DB6A86588 /* Debug */,
+				BAD2FB6E5155B35F1A08D22B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		A230CB35BDCFAE06A82F59C1 /* Build configuration list for PBXNativeTarget "InHuman" */ = {
+		ADB92077C61D56BC92015003 /* Build configuration list for PBXNativeTarget "FaceCheck" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				B055F15F1F64B0E6C09103DD /* Debug */,
-				53C315EB27AF6002136308E6 /* Release */,
+				3472CE221CF8AEC96CC209F2 /* Debug */,
+				8138912509AF2E0A2922E847 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 5D1FE04E2689B35A746D7B45 /* Project object */;
+	rootObject = 589A78D631D532B0A1165093 /* Project object */;
 }

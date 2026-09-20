@@ -8,7 +8,7 @@ enum CaptureError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noCamera: return "No front camera available."
-        case .denied: return "Camera access is off. Enable it in Settings > InHuman."
+        case .denied: return "Camera access is off. Enable it in Settings > FaceCheck."
         case .writerFailed(let why): return "Recording failed: \(why)"
         case .aborted: return "Check cancelled."
         }
@@ -26,7 +26,7 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
     let session = AVCaptureSession()
     private(set) var device: AVCaptureDevice?
     private let output = AVCaptureVideoDataOutput()
-    private let queue = DispatchQueue(label: "inhuman.capture")
+    private let queue = DispatchQueue(label: "facecheck.capture")
     private let ciContext = CIContext()
     private var configured = false
 
@@ -45,7 +45,7 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
     private var transitSeen = 0, transitQueued = 0, transitDrops = 0
     private var transitSlowestMS = 0.0
     // Owned by `encodeQueue`: JPEG encoding stays off the capture queue.
-    private let encodeQueue = DispatchQueue(label: "inhuman.transit.encode")
+    private let encodeQueue = DispatchQueue(label: "facecheck.transit.encode")
     private var transitBlob = Data()
     private var transitTS: [Double] = []
     static let transitInterval = 0.1, transitWidth: CGFloat = 480, transitMaxFrames = 260

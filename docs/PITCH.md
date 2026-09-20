@@ -1,4 +1,4 @@
-# InHuman: the pitch
+# FaceCheck: the pitch
 
 Three versions: 10 seconds, 60 seconds, and the full 4 minutes with the demo inside it.
 Then who says what.
@@ -51,7 +51,7 @@ Use this when a judge walks up mid-run, or when someone asks "what is it?" in a 
 > dollars to accounts in Hong Kong. Nobody stole a password. The face was the credential, and the
 > face was fake.
 >
-> InHuman is a second factor that proves a live human is at the camera. It runs as an iPhone app
+> FaceCheck is a second factor that proves a live human is at the camera. It runs as an iPhone app
 > and as a web app on a laptop webcam.
 >
 > It works on physics, not on artefacts. The screen is a light source. Skin lit by a red flash goes
@@ -83,7 +83,7 @@ Everything in `[ ]` is an action, not a line.
 > million dollars, to accounts in Hong Kong. Nobody hacked a password. The face was the credential,
 > and the face was fake.
 >
-> This is InHuman. It proves a live human is at the camera. Let me show you, then I will tell you
+> This is FaceCheck. It proves a live human is at the camera. Let me show you, then I will tell you
 > how it works.
 
 Do not explain the architecture yet. Do not say the word "pipeline".
@@ -130,7 +130,7 @@ attacks it lands between 0.88 and 0.98. Anything above 0.35 makes the point.]
 
 > This is the part that matters. On the left is what ordinary face recognition concluded: 0.98
 > similarity against a 0.35 pass mark. Face recognition would have released the wire. On the right
-> is InHuman: no cornea-sized reflection of our shapes inside an iris. The deepfake has an eye
+> is FaceCheck: no cornea-sized reflection of our shapes inside an iris. The deepfake has an eye
 > painted on it. That eye is not a mirror.
 
 ### 4. How it works (65 s) - [C]

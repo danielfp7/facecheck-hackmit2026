@@ -144,7 +144,7 @@ challenge is server-owned rather than client-generated.
 
 ## Would this have stopped the Arup attack? That was a video call, not a login.
 
-Not by itself, and this is worth being precise about. InHuman is an authentication factor, not a
+Not by itself, and this is worth being precise about. FaceCheck is an authentication factor, not a
 Zoom plugin. Where it belongs in that story is one step later: on the payment approval. That is
 exactly what the demo shows, a wire above a policy limit that will not release until a live person
 proves they are at the camera. The deepfaked CFO can be as convincing as it likes on the call; the

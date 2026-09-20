@@ -23,7 +23,7 @@ rejected. See PITCH.md, "Exactly what the counter counts".
 ## Slide 1. Title
 
 **On screen**
-- InHuman
+- FaceCheck
 - Proves a live human is at the camera, not a real-time deepfake
 - One line underneath, small: 13 live face-swap attacks. 13 rejected. Face recognition scored the
   same fakes 0.88 to 0.98.

@@ -1,5 +1,5 @@
 [project]
-name = "inhuman-server"
+name = "facecheck-server"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [

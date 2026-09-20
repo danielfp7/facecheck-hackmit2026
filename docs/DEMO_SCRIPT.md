@@ -115,7 +115,7 @@ That writes a `run`-labelled capture, which does not show up in the attack log (
 ### 1.5 Browser tabs, in this order, left to right
 
 1. <http://localhost:8000> - the bank page. This is the demo.
-2. <http://localhost:8000/?inject> - the bank page in attack mode. Opens the InHuman tab already
+2. <http://localhost:8000/?inject> - the bank page in attack mode. Opens the FaceCheck tab already
    pointed at the face swap.
 3. <http://localhost:8000/app/attacks.html> - the attack log. This is the closing slide.
 4. <http://localhost:8000/?replay=0920-004853_inject-attack_b1c2d3b7784326d3> - the attack fallback,
@@ -129,7 +129,7 @@ for camera access and you do not have time for that.
 Open the attack log. Read the three counters out loud to each other:
 
 - attacks
-- caught by InHuman
+- caught by FaceCheck
 - fooled face recognition
 
 At 02:12 today: **13 / 13 / 11**. At 02:40: **14 / 14 / 11**, because another attack was recorded at
@@ -151,7 +151,7 @@ why before a judge scrolls down: DEMO_SCRIPT section 6, and FAQ.md question 5.
 ### 1.7 Record the backup video (do not skip)
 
 Before the room fills up, screen-record one genuine pass and one attack rejection end to end.
-QuickTime > File > New Screen Recording. Save both to `~/Movies/inhuman-backup.mov`. Open it once
+QuickTime > File > New Screen Recording. Save both to `~/Movies/facecheck-backup.mov`. Open it once
 so it is in QuickTime's recent files. This is the last fallback and it takes four minutes to make.
 
 ---
@@ -159,7 +159,7 @@ so it is in QuickTime's recent files. This is the last fallback and it takes fou
 ## 2. Reset between judges (30 seconds)
 
 1. Bank page: reload it. The status panel clears and both buttons re-enable.
-2. InHuman tab: press **Done**, or reload `/app/`.
+2. FaceCheck tab: press **Done**, or reload `/app/`.
 3. Check the rig is still alive: `curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8765/frame?after=0"`.
 4. Wipe the laptop camera and the phone's front camera with a cloth. A smudge costs you the corneal
    reflection.
@@ -250,7 +250,7 @@ Watching the counter move honestly in front of a judge is worth more than a tidy
 ## 5. Fallbacks, in order
 
 Every saved check can be re-rendered from disk. No camera, no rig, no live run required. Both the
-bank page and the InHuman app take `?replay=<capture folder>`.
+bank page and the FaceCheck app take `?replay=<capture folder>`.
 
 ### The replay URLs that matter
 
@@ -296,7 +296,7 @@ usually blocks phone to laptop traffic. If it still fails after 60 seconds, aban
 that judge and do everything on the laptop. Do not debug networking with a judge standing there.
 
 **The server is dead and will not restart.**
-Open `~/Movies/inhuman-backup.mov` in QuickTime and narrate over it. Then talk through DECK.md from
+Open `~/Movies/facecheck-backup.mov` in QuickTime and narrate over it. Then talk through DECK.md from
 the laptop. You still have the whole technical story and the numbers.
 
 **Everything is dead including the laptop.**

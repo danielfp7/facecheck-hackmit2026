@@ -2,7 +2,7 @@ import AVFoundation
 import SwiftUI
 
 @main
-struct InHumanApp: App {
+struct FaceCheckApp: App {
     @StateObject private var flow = Flow()
 
     var body: some Scene {
@@ -71,7 +71,7 @@ struct HomeView: View {
             topBar
             Spacer(minLength: 8)
             IrisMark(size: 124, active: waiting)
-            Text("InHuman")
+            Text("FaceCheck")
                 .font(.system(size: 38, weight: .bold))
                 .foregroundStyle(Color.ihText)
                 .padding(.top, 24)
@@ -98,7 +98,7 @@ struct HomeView: View {
 
     private var topBar: some View {
         HStack {
-            Text("InHuman · second factor").dataLabel()
+            Text("FaceCheck · second factor").dataLabel()
             Spacer()
             Button { showSettings = true } label: {
                 Image(systemName: "slider.horizontal.3")

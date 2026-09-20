@@ -1,4 +1,4 @@
-# InHuman
+# FaceCheck
 
 A Duo-style second factor that proves a **live human** is holding the phone, not a real-time face swap.
 
@@ -18,7 +18,7 @@ Where things stand: the app builds with Xcode 27 and runs on an iPhone 14 Pro, a
 **A. Get the phone app running** (Xcode is a multi-GB download; start it first)
 
 1. Install Xcode 27 (this Mac is on macOS 27) from developer.apple.com as a `.xip`, plus the iOS platform it offers. Then `sudo xcode-select -s /Applications/Xcode.app` and open Xcode once.
-2. Generate and open the project: `ios/bin/xcodegen/bin/xcodegen generate --spec ios/project.yml`, then open `ios/InHuman.xcodeproj`.
+2. Generate and open the project: `ios/bin/xcodegen/bin/xcodegen generate --spec ios/project.yml`, then open `ios/FaceCheck.xcodeproj`.
 3. Pick your signing team, plug in the iPhone, enable Developer Mode (needs a reboot), build.
 4. Trust the developer profile on the phone: Settings → General → VPN & Device Management.
 5. Phone settings: turn off Auto-Brightness, True Tone, Night Shift and Low Power Mode.
@@ -33,7 +33,7 @@ Where things stand: the app builds with Xcode 27 and runs on an iPhone 14 Pro, a
 
 9. Tap **Enroll my face** and take the selfie.
 10. Tap **Run a test check** with the label `real`. Look at the Eye reflection tile: are the crops sharp, and is the shape visible in the eye?
-11. If the crops are blurred (fixed-focus front camera, iPhone 13 and earlier), restart the server with `INHUMAN_SHAPE_MODE=layout`.
+11. If the crops are blurred (fixed-focus front camera, iPhone 13 and earlier), restart the server with `FACECHECK_SHAPE_MODE=layout`.
 
 **D. Tune on real captures**
 
@@ -103,7 +103,7 @@ Verified so far with headless Chrome and a fake camera (flow, upload, server par
 ## Build the phone app
 
 1. Install Xcode (`.xip` from developer.apple.com matching the phone's iOS) and its iOS platform, then `sudo xcode-select -s /Applications/Xcode.app`.
-2. `ios/bin/xcodegen/bin/xcodegen generate --spec ios/project.yml`, open `ios/InHuman.xcodeproj`.
+2. `ios/bin/xcodegen/bin/xcodegen generate --spec ios/project.yml`, open `ios/FaceCheck.xcodeproj`.
 3. Signing & Capabilities → pick your team (or put the Team ID in `project.yml` so regenerating keeps it). Change the bundle id if Xcode says it's taken.
 4. Plug in the iPhone, enable Developer Mode, run. Trust the developer profile in Settings → General → VPN & Device Management.
 5. In the app's Settings set the server address. Most reliable at a venue: turn on the iPhone's Personal Hotspot, connect the Mac over USB, and use `http://<mac-name>.local:8000` (the Mac is usually `172.20.10.2`). Accept the local-network prompt.
@@ -122,7 +122,7 @@ uv run --project server tools/replay.py --set-baseline   # stores this phone's g
 uv run --project server tools/replay.py                  # compare rows, then edit THRESHOLDS in server/verdict.py
 ```
 
-If the phone's front camera is fixed-focus (iPhone 13 and earlier) the shape outline blurs at 3 inches. Run the server with `INHUMAN_SHAPE_MODE=layout` to score shape position + color instead of the outline.
+If the phone's front camera is fixed-focus (iPhone 13 and earlier) the shape outline blurs at 3 inches. Run the server with `FACECHECK_SHAPE_MODE=layout` to score shape position + color instead of the outline.
 
 ## Testing with a deepfake
 

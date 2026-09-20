@@ -1,4 +1,4 @@
-"""InHuman verification server.
+"""FaceCheck verification server.
 
 Run:  uv run uvicorn main:app --host 0.0.0.0 --port 8000
 """
@@ -32,10 +32,10 @@ for d in (USERS, CAPTURES):
     d.mkdir(parents=True, exist_ok=True)
 
 # 'auto' scores the outline when the reflection is big enough to read; 'shape' always; 'layout' never.
-SHAPE_MODE = os.environ.get("INHUMAN_SHAPE_MODE", "auto")
+SHAPE_MODE = os.environ.get("FACECHECK_SHAPE_MODE", "auto")
 CHALLENGE_TTL_S = 90
 
-app = FastAPI(title="InHuman")
+app = FastAPI(title="FaceCheck")
 
 # In-memory state: fine for a demo, lost on restart.
 challenges: dict[str, tuple[float, challenge_mod.Challenge]] = {}

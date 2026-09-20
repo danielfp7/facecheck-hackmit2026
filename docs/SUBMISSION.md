@@ -15,7 +15,7 @@ has been rejected. The 0.88 to 0.98 range and the 0.35 pass mark are stable.
 
 ## Name
 
-**InHuman**
+**FaceCheck**
 
 ## Tagline (one line)
 
@@ -23,13 +23,13 @@ A second factor that proves a live human is at the camera, not a real-time deepf
 
 ## Short description (about 280 characters)
 
-Face recognition cannot tell you from a live face swap. InHuman flashes coloured shapes at your eye
+Face recognition cannot tell you from a live face swap. FaceCheck flashes coloured shapes at your eye
 and reads their reflection off your cornea, a 7.8 mm convex mirror. 13 live deepfake attacks, 13
 rejected. Face recognition scored those same fakes 0.88 to 0.98 against a 0.35 pass mark.
 
 ## What it does
 
-InHuman is a step-up authentication factor, in the same slot as a push notification from an
+FaceCheck is a step-up authentication factor, in the same slot as a push notification from an
 authenticator app. An application asks for verification. The user takes an arm's-length selfie,
 then leans in until one eye fills a ring on the screen. The screen goes to full brightness and
 flashes randomly chosen coloured shapes for about five seconds. The server returns **verified**,

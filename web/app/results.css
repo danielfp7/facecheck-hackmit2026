@@ -35,7 +35,7 @@
 .heroReason { margin: 0; max-width: 600px; font-size: 17px; line-height: 1.45; color: var(--text-2); }
 #results .heroMeta { margin: 4px 0 0; font: 500 12px/1 var(--mono); letter-spacing: .02em; color: var(--text-3); white-space: pre; }
 
-/* ---------- 2. face recognition alone vs InHuman ---------- */
+/* ---------- 2. face recognition alone vs FaceCheck ---------- */
 .compare { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); align-items: stretch; gap: 0 12px;
   padding: 18px 20px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); }
 .compareKicker { grid-column: 1 / -1; margin-bottom: 14px; }
@@ -58,9 +58,9 @@
 .tag { display: inline-flex; align-items: center; font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase;
   padding: 6px 9px; border-radius: 999px; border: 1px solid currentColor; }
 .tag.t-ok { color: var(--ok); background: var(--ok-soft); } .tag.t-bad { color: var(--bad); background: var(--bad-soft); } .tag.t-warn { color: var(--warn); background: var(--warn-soft); }
-/* the money moment: face recognition let a deepfake through, InHuman didn't */
+/* the money moment: face recognition let a deepfake through, FaceCheck didn't */
 .compare[data-mode="fooled"] .cell.face { background: var(--bad-soft); border-color: var(--bad); }
-.compare[data-mode="fooled"] .cell.inhuman { background: var(--ok-soft); border-color: var(--ok); }
+.compare[data-mode="fooled"] .cell.facecheck { background: var(--ok-soft); border-color: var(--ok); }
 .compareNote { grid-column: 1 / -1; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
 
 /* threshold gauge: fill to the score, hairline tick at the pass mark */
