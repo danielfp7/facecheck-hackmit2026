@@ -137,6 +137,14 @@ uv run --project server attack/live.py --source victim.jpg
 
 `attack/live.py` is the simplest way: the same swap model (inswapper_128) in a plain full-screen window, with nothing to click. Pass several photos of the same person to `--source` for a steadier likeness. Space turns the swap on and off, `+`/`-` zoom in so the phone can be shown a life-size eye, `h` shows the frame rate, `q` quits. Run it from the Terminal app: macOS gives camera permission per app and refuses anything started from an editor. If it still can't read the camera, turn Terminal on under System Settings > Privacy & Security > Camera.
 
+**Attack the web app on the computer.** A real attacker feeds the fake to the browser through a virtual camera. The test setup does the same without installing one: the swap tool serves its frames, and the web app's test mode uses them as its camera, so the check sees only swapped frames with the swap's real delay.
+
+```sh
+uv run --project server attack/live.py --serve        # from the Terminal app; no window, Ctrl-C to stop
+```
+
+Then open <http://localhost:8000/app/?inject> in Chrome. The page says it is in attack-test mode and labels the capture `inject-attack`. Run a check as usual, sitting at the Mac's camera.
+
 Deep-Live-Cam's own app is the alternative:
 
 ```sh

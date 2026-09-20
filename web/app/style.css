@@ -23,6 +23,7 @@ body { margin: 0; background: var(--bg); color: var(--ink);
 h1 { font-size: 24px; margin: 0; }
 .muted { color: var(--muted); margin: 0; }
 .fine { font-size: 13px; }
+.testNote { margin: 0; padding: 8px 10px; border-radius: 10px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 600; }
 .row { display: flex; gap: 10px; } .grow { flex: 1; }
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); text-align: left; }
 input, select { padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line);

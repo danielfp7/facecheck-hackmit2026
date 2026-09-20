@@ -2,6 +2,11 @@
 
   uv run --project server attack/live.py                      # swaps in attack/Deep-Live-Cam/victim.jpg
   uv run --project server attack/live.py --source a.jpg b.jpg c.jpg   # several photos of one person
+  uv run --project server attack/live.py --serve              # no window: feed the web app instead
+
+--serve is the injection attack on the computer. A real attacker puts the fake into the browser
+with a virtual camera; here the web app's test mode, http://localhost:8000/app/?inject, takes its
+"camera" from this tool, so the check sees only swapped frames, with the swap's real delay.
 
 Run it from the Terminal app: macOS gives camera permission per app, and anything started from
 VS Code is refused. Same model as Deep-Live-Cam (inswapper_128), ~30 fps on this Mac.
@@ -17,6 +22,7 @@ import argparse
 import sys
 import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import cv2
@@ -69,6 +75,67 @@ class LatestFrame:
         return frame
 
 
+class FrameServer:
+    """Hands the newest swapped frame to the web app: GET /frame?after=<seq> waits for a frame
+    newer than <seq> and returns it as a JPEG, with its number in X-Seq."""
+
+    def __init__(self, port: int):
+        self.jpeg, self.seq, self.ready = b"", 0, threading.Condition()
+        outer = self
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"          # keep-alive: one connection for the whole run
+
+            def do_GET(self):
+                after = int(self.path.partition("after=")[2] or 0) if "after=" in self.path else 0
+                with outer.ready:
+                    outer.ready.wait_for(lambda: outer.seq > after, timeout=2.0)
+                    jpeg, seq = outer.jpeg, outer.seq
+                self.send_response(200 if jpeg else 503)
+                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Content-Length", str(len(jpeg)))
+                self.send_header("X-Seq", str(seq))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Expose-Headers", "X-Seq")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(jpeg)
+
+            def log_message(self, *args):
+                pass
+
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        self.httpd.daemon_threads = True
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def publish(self, frame):
+        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        if ok:
+            with self.ready:
+                self.jpeg, self.seq = buf.tobytes(), self.seq + 1
+                self.ready.notify_all()
+
+
+def serve(frames: "LatestFrame", swap, port: int):
+    server = FrameServer(port)
+    print(f"serving swapped frames on http://127.0.0.1:{port}  ->  open http://localhost:8000/app/?inject in Chrome")
+    print("Ctrl-C to stop.")
+    n, since = 0, time.monotonic()
+    try:
+        while True:
+            frame = frames.take()
+            if frame is None:
+                time.sleep(0.002)
+                continue
+            server.publish(swap(frame))
+            n += 1
+            if time.monotonic() - since >= 5:
+                print(f"  {n / (time.monotonic() - since):.0f} fps")
+                n, since = 0, time.monotonic()
+    except KeyboardInterrupt:
+        pass
+
+
 def zoomed(frame, zoom: float):
     if zoom <= 1.0:
         return frame
@@ -84,6 +151,8 @@ def main():
                     help="photo(s) of the face to swap in; several of the same person give a steadier likeness")
     ap.add_argument("--camera", type=int, default=builtin_camera(), help="default: this Mac's own camera, not a nearby iPhone")
     ap.add_argument("--windowed", action="store_true", help="don't go full screen")
+    ap.add_argument("--serve", nargs="?", type=int, const=8765, metavar="PORT",
+                    help="no window; serve the swapped frames to the web app's ?inject test mode")
     args = ap.parse_args()
     for path in args.source:
         if not Path(path).exists():
@@ -93,6 +162,11 @@ def main():
     print("loading the swap model (about 10 s the first time)...")
     swap = load_swapper(args.source)
     frames = LatestFrame(cap)
+    if args.serve:
+        serve(frames, swap, args.serve)
+        frames.alive = False
+        cap.release()
+        return
 
     cv2.namedWindow(WIN, cv2.WINDOW_NORMAL)
     if not args.windowed:

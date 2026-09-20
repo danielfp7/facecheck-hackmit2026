@@ -28,6 +28,11 @@ const S = {
   aborted: null,
 };
 
+// Attack test mode (?inject): the "camera" is the live face swap served by `attack/live.py --serve`,
+// which is what a virtual camera does for a real attacker. Everything after openCamera() is unchanged.
+const INJECT = new URLSearchParams(location.search).has("inject")
+  ? `http://127.0.0.1:${new URLSearchParams(location.search).get("inject") || 8765}` : null;
+
 const video = $("video");
 const full = document.createElement("canvas");
 const small = document.createElement("canvas");
@@ -99,8 +104,32 @@ async function poll() {
 
 // ---------- camera ----------
 
+/** A MediaStream fed by the swapped frames, painted onto a canvas as they arrive. */
+async function injectedStream() {
+  const next = async (after) => {
+    const r = await fetch(`${INJECT}/frame?after=${after}`, { cache: "no-store" });
+    if (!r.ok) throw new Error("no frame yet");
+    return { seq: Number(r.headers.get("X-Seq")), bmp: await createImageBitmap(await r.blob()) };
+  };
+  let first;
+  try { first = await next(0); } catch { throw new Error("The fake isn't running. Start it first: attack/live.py --serve"); }
+  const c = document.createElement("canvas");
+  c.width = first.bmp.width;
+  c.height = first.bmp.height;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(first.bmp, 0, 0);
+  const stream = c.captureStream();
+  (async () => {
+    let seq = first.seq;
+    while (stream.active) {
+      try { const f = await next(seq); seq = f.seq; ctx.drawImage(f.bmp, 0, 0); f.bmp.close(); } catch { await sleep(0.2); }
+    }
+  })();
+  return stream;
+}
+
 async function openCamera() {
-  S.stream = await navigator.mediaDevices.getUserMedia({
+  S.stream = INJECT ? await injectedStream() : await navigator.mediaDevices.getUserMedia({
     audio: false,
     video: { facingMode: "user", width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
   });
@@ -476,6 +505,7 @@ function renderResults(r) {
 const params = new URLSearchParams(location.search);
 $("user").value = params.get("user") || localStorage.getItem("inhuman.user") || "daniel";
 $("user").addEventListener("change", () => { localStorage.setItem("inhuman.user", user()); poll(); });
+if (INJECT) { $("injectNote").hidden = false; $("label").value = "inject-attack"; }
 $("btnEnroll").onclick = () => begin(true);
 $("btnTest").onclick = () => { S.request = null; show("warning"); };
 $("btnApprove").onclick = () => show("warning");
