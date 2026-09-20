@@ -205,6 +205,28 @@ def _measure_glint(p: dict, gx: int, gy: int, fs: float) -> dict:
             "peak": float(p["score"][gy, gx])}
 
 
+def _eye_hint(meta: dict, k: float, bundle, ch, assign) -> tuple[float, float] | None:
+    """Where the client's face tracker saw the eye, at LOCALIZE_W scale.
+
+    meta["eye_track"] holds one entry per recorded frame: [x, y, iris_radius] in
+    full-resolution video pixels, or null where the tracker lost the face. Only frames
+    belonging to a shape state count: people are still moving in on the early frames, and
+    a median over all of them lands between where they started and where they ended up.
+    """
+    track = meta.get("eye_track") or []
+    if len(track) < 5:
+        return None
+    lit = {s.index for s in ch.states if s.shape is not None}
+    pts = [e for i, e in enumerate(track)
+           if e and len(e) >= 2 and i < len(assign) and assign[i] in lit]
+    if len(pts) < 5:                       # fall back to every frame that tracked
+        pts = [e for e in track if e and len(e) >= 2]
+    if len(pts) < 5:
+        return None
+    cx, cy = np.median(np.array([[float(e[0]), float(e[1])] for e in pts]), axis=0)
+    return cx * k, cy * k
+
+
 def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = None) -> dict:
     """`stash`, if given, receives the reference eye crop and iris fit for the continuity check."""
     W, H = bundle.full_size
@@ -229,18 +251,42 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
         responses[s.index] = score
         spread = cv2.dilate(np.sqrt(score), np.ones((2 * R + 1, 2 * R + 1), np.uint8))
         acc = spread if acc is None else acc + spread
-    py, px = np.unravel_index(int(np.argmax(acc)), acc.shape)
 
-    found, glints = 0, []
-    for s in usable:
-        score = responses[s.index]
-        y0, x0 = max(py - R, 0), max(px - R, 0)
-        win = score[y0:py + R + 1, x0:px + R + 1]
-        wy, wx = np.unravel_index(int(np.argmax(win)), win.shape)
-        glints.append((x0 + wx, y0 + wy))
-        if win.max() > 3.0 * (np.percentile(score, 99.9) + 1e-9):
-            found += 1
-    if found < max(3, len(usable) // 2):
+    def probe(px: int, py: int):
+        """Strongest reflection near (px, py) per state, and how many states show a real one."""
+        found, glints = 0, []
+        for s in usable:
+            score = responses[s.index]
+            y0, x0 = max(py - R, 0), max(px - R, 0)
+            win = score[y0:py + R + 1, x0:px + R + 1]
+            if win.size == 0:
+                glints.append((px, py))
+                continue
+            wy, wx = np.unravel_index(int(np.argmax(win)), win.shape)
+            glints.append((x0 + wx, y0 + wy))
+            if win.max() > 3.0 * (np.percentile(score, 99.9) + 1e-9):
+                found += 1
+        return found, glints
+
+    # First try the spot whose brightness follows the flashes, which is what a cornea does.
+    need = max(3, len(usable) // 2)
+    py, px = np.unravel_index(int(np.argmax(acc)), acc.shape)
+    found, glints = probe(int(px), int(py))
+
+    # If that search came up short, try where the client's face tracker says the eye is.
+    # It fails on faint reflections and reports "no eye reflection found" with the eye in
+    # plain view, which is the single biggest cause of genuine users being turned away.
+    # Only ever a second chance: a fake with no reflection still finds nothing here.
+    hinted = False
+    if found < need:
+        hint = _eye_hint(meta, k, bundle, ch, assign)
+        if hint is not None:
+            hx = int(np.clip(hint[0], 0, acc.shape[1] - 1))
+            hy = int(np.clip(hint[1], 0, acc.shape[0] - 1))
+            f2, g2 = probe(hx, hy)
+            if f2 > found:
+                found, glints, hinted = f2, g2, True
+    if found < need:
         return {"ok": False, "reason": "no eye reflection found", "states_with_reflection": found}
     ex, ey = np.median(np.array(glints), axis=0)      # eye position at LOCALIZE_W scale
 
