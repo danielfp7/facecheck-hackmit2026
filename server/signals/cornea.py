@@ -32,6 +32,9 @@ DRIFT_PX = 50                  # eye drift tolerated between states, at LOCALIZE
                                # and locks onto the wrong spot on a real capture; don't widen without data.
 CROP_HALF = 260                # eye crop half-size, at LOCALIZE_W scale
 MIN_READABLE_SPAN_PX = 18      # below this the outline can't be told apart; score layout only
+# Only read the outline when measured and predicted size roughly agree. Outside this band the
+# iris fit is unreliable, so the scale is guesswork and the decode is worse than not trying.
+SHAPE_TRUST = (0.45, 2.2)
 SCALES = np.linspace(0.6, 1.6, 8)
 ASPECTS = (0.7, 0.85, 1.0)     # off-axis compression of the reflection's height
 LUMA = np.array([0.299, 0.587, 0.114], np.float32)
@@ -362,7 +365,17 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
     ty = int(np.clip(ty, T, ref_gray.shape[0] - T))
     tmpl = ref_gray[ty - T:ty + T, tx - T:tx + T]
     states_out, us, vs = [], [], []
-    temps = _templates(span_px) if span_px >= MIN_READABLE_SPAN_PX else []
+    # Render the outline templates at the size of the reflection we actually measured, not
+    # the size the geometry predicts. The prediction runs through the iris fit, and when the
+    # fit grabs something larger than the iris (a lid crease, the eye socket) it reports the
+    # face as much closer than it is and the predicted span comes out several times too big.
+    # Matching a ~11 px reflection against 64 px templates returns whichever shape happens to
+    # correlate, which is how squares started reading as circles on smaller eyes.
+    # The predicted span keeps its real job: size_ratio, the check that catches a flat screen.
+    read_px = measured_px if measured_px >= MIN_READABLE_SPAN_PX else span_px
+    temps = (_templates(read_px)
+             if min(read_px, span_px) >= MIN_READABLE_SPAN_PX and SHAPE_TRUST[0] <= size_ratio <= SHAPE_TRUST[1]
+             else [])
     for p in per:
         s = p["s"]
         gray = (crops[s.index] @ LUMA).astype(np.float32)
