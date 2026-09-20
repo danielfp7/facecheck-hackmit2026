@@ -4,8 +4,8 @@
 #
 #   attack/render.sh victim.jpg attacker.mov [out.mp4] [--fast]
 #
-# Offline beats live on this Mac: live swapping runs at ~4 fps, a rendered clip plays at
-# full frame rate with the face enhancer on. Cost: ~0.75 s per frame (~0.3 s with --fast,
+# Live swapping is already smooth on this Mac (~36 fps); what offline adds is the face
+# enhancer, which is too slow to run live. Cost: ~0.75 s per frame (~0.3 s with --fast,
 # which skips the enhancer), so a 20 s clip takes 7-8 minutes.
 # Only use faces of people who have agreed to it.
 set -euo pipefail

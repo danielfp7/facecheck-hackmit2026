@@ -136,9 +136,9 @@ attack/setup.sh      # once; downloads ~600 MB of models and a bundled ffmpeg
 attack/run.sh
 ```
 
-In its window: **Select a face** → the victim's photo, then **Live**. macOS will ask for camera access for the terminal the first time. Make the preview as large as it goes, turn the Mac's brightness to maximum, and sit so the swapped face is roughly life-size. Expect single-digit fps on this Mac.
+In its window: **Select a face** → the victim's photo, then **Live**. macOS will ask for camera access for the terminal the first time. Make the preview as large as it goes, turn the Mac's brightness to maximum, and sit so the swapped face is roughly life-size. Launch it from the Terminal app (not from an editor), so macOS asks Terminal for camera access; without it the preview stays black.
 
-**A better-looking deepfake: pre-render it.** Live swapping runs at about 4 fps on this Mac. For a screen attack the fake doesn't need to be live, so film 20 s of the attacker (QuickTime → New Movie Recording, face filling the frame, slow head turns, looking at the camera) and render it offline with the face enhancer:
+**Optional, for the best-looking fake: pre-render it.** Live swapping already runs smoothly here (about 36 fps), but the face enhancer is too slow to use live. For a screen attack the fake doesn't need to be live, so film 20 s of the attacker (QuickTime → New Movie Recording, face filling the frame, slow head turns, looking at the camera) and render it offline with the face enhancer:
 
 ```sh
 attack/render.sh attack/Deep-Live-Cam/victim.jpg ~/Movies/attacker.mov ~/Movies/deepfake.mp4    # ~7-8 min for 20 s; add --fast to skip the enhancer
@@ -159,7 +159,7 @@ uv run --project server tools/mac_capture.py --user <victim> --label mac-real   
 uv run --project server tools/mac_capture.py --user <victim> --swap-source victim.jpg --label dlc-attack
 ```
 
-Compare the **lag** the two runs print. The swap costs about 236 ms per frame on this Mac against a limit of baseline + 100 ms, and the literature puts a full attacker pipeline at 150-300 ms. Neither Mac run can come back verified: a webcam at arm's length can't resolve the eye reflection. This one exists for the measured delay, which is the number for the pitch.
+Compare the **lag** the two runs print; that difference is the attacker's added delay. Measure it, don't assume it: a well-configured swap is fast (Deep-Live-Cam's own pipeline runs at about 28 ms per frame, 36 fps, on this Mac), so the extra delay comes mostly from the attacker's capture, copy and display hops, which the literature puts at 150-300 ms end to end. The limit is baseline + 100 ms. If a tuned attacker measures under that, lag alone doesn't stop them and the eye reflection and continuity checks have to. Neither Mac run can come back verified: a webcam at arm's length can't resolve the eye reflection. This one exists for the measured delay, which is the number for the pitch.
 
 **Controls, so a red result means something:** a genuine run by the victim (should verify), a genuine run by a teammate with glasses, a tablet replaying a recording of the victim (`replay`), and a printed photo (`print`).
 

@@ -44,7 +44,11 @@ def load_swapper(source_path: str):
     model = Path(__file__).resolve().parents[1] / "attack/Deep-Live-Cam/models/inswapper_128_fp16.onnx"
     if not model.exists():
         sys.exit(f"missing {model}; run attack/setup.sh first")
-    providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+    # ModelFormat=MLProgram matters enormously: with onnxruntime's default CoreML settings the
+    # swap model runs at CPU speed (~240 ms), with it ~16 ms. An honest attacker uses the fast
+    # one, so the lag this tool reports must too.
+    providers = [("CoreMLExecutionProvider", {"ModelFormat": "MLProgram", "MLComputeUnits": "ALL"}),
+                 "CPUExecutionProvider"]
     # The source face needs a full analysis once; per frame the swapper only needs detection.
     full = FaceAnalysis(name="buffalo_l", providers=providers)
     full.prepare(ctx_id=0, det_size=(640, 640))
