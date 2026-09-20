@@ -172,7 +172,9 @@ def main():
     if not args.windowed:
         cv2.setWindowProperty(WIN, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
-    on, hud, zoom, fps, last = True, False, 1.0, 0.0, time.monotonic()
+    # Readout on by default: when space toggles the swap mid-demo you want to see which
+    # mode you are in. h hides it.
+    on, hud, zoom, fps, last = True, True, 1.0, 0.0, time.monotonic()
     while True:
         frame = frames.take()
         if frame is None:
@@ -184,8 +186,10 @@ def main():
         now = time.monotonic()
         fps, last = 0.9 * fps + 0.1 / max(now - last, 1e-6), now
         if hud:
-            cv2.putText(frame, f"{'SWAP' if on else 'real'}  {fps:.0f} fps  x{zoom:.1f}", (24, 48),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
+            label = f"{'SWAP ON' if on else 'REAL FACE'}   {fps:.0f} fps   x{zoom:.1f}"
+            colour = (80, 80, 255) if on else (120, 220, 120)
+            cv2.putText(frame, label, (24, 52), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 0, 0), 6, cv2.LINE_AA)
+            cv2.putText(frame, label, (24, 52), cv2.FONT_HERSHEY_SIMPLEX, 1.1, colour, 2, cv2.LINE_AA)
         cv2.imshow(WIN, frame)
         key = cv2.waitKey(1) & 0xFF
         if key in (ord("q"), 27):
