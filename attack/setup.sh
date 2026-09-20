@@ -27,6 +27,13 @@ for m in inswapper_128_fp16.onnx gfpgan-1024.onnx; do
   [ -s "models/$m" ] || curl -L --fail --retry 3 -o "models/$m" "$HF/$m"
 done
 
+# Lighter face enhancers that are fast enough to run live. Deep-Live-Cam's own download link for
+# these points at a release tag that doesn't exist (404); the files are under "Models".
+UP=https://github.com/harisreedhar/Face-Upscalers-ONNX/releases/download/Models
+for m in GPEN-BFR-256.onnx GPEN-BFR-512.onnx; do
+  [ -s "models/$m" ] || curl -L --fail --retry 3 -o "models/$m" "$UP/$m"
+done
+
 echo
 echo "Ready. Launch the live swapper with:"
 echo "  attack/run.sh"

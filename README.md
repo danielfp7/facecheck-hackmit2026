@@ -136,6 +136,8 @@ attack/setup.sh      # once; downloads ~600 MB of models and a bundled ffmpeg
 attack/run.sh
 ```
 
+`attack/run.sh` runs the swap with a live face enhancer (GPEN-256): about 12 fps with a visibly sharper face. `attack/run.sh fast` drops the enhancer for about 35 fps and a softer face. Measured here, both score about 0.9 against the victim in face recognition (a stranger scores -0.03, the pass mark is 0.35), so the enhancer is for how it looks to people, not for how strong the attack is.
+
 In its window: **Select a face** → the victim's photo, then **Live**. macOS will ask for camera access for the terminal the first time. Make the preview as large as it goes, turn the Mac's brightness to maximum, and sit so the swapped face is roughly life-size. Launch it from the Terminal app (not from an editor), so macOS asks Terminal for camera access; without it the preview stays black.
 
 **Optional, for the best-looking fake: pre-render it.** Live swapping already runs smoothly here (about 36 fps), but the face enhancer is too slow to use live. For a screen attack the fake doesn't need to be live, so film 20 s of the attacker (QuickTime → New Movie Recording, face filling the frame, slow head turns, looking at the camera) and render it offline with the face enhancer:
