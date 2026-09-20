@@ -37,8 +37,12 @@ from render import render_color, render_state  # noqa: E402
 WIN = "InHuman challenge"
 
 
-def load_swapper(source_path: str):
-    """inswapper from Deep-Live-Cam's models folder, plus the source identity."""
+def load_swapper(source_path, enhance=None):
+    """inswapper from Deep-Live-Cam's models folder, plus the source identity.
+
+    source_path: one photo, or several of the same person (their embeddings are averaged,
+    which gives a steadier likeness than any single photo). enhance(frame, face) -> frame,
+    if given, runs on each face after it is swapped."""
     import insightface
     from insightface.app import FaceAnalysis
     model = Path(__file__).resolve().parents[1] / "attack/Deep-Live-Cam/models/inswapper_128_fp16.onnx"
@@ -55,14 +59,22 @@ def load_swapper(source_path: str):
     fa = FaceAnalysis(name="buffalo_l", providers=providers, allowed_modules=["detection"])
     fa.prepare(ctx_id=0, det_size=(640, 640))
     swapper = insightface.model_zoo.get_model(str(model), providers=providers)
-    src_faces = full.get(cv2.imread(source_path))
-    if not src_faces:
-        sys.exit("no face in --swap-source image")
-    src = src_faces[0]
+    paths = [source_path] if isinstance(source_path, (str, Path)) else list(source_path)
+    found = []
+    for path in paths:
+        faces = full.get(cv2.imread(str(path)))
+        if not faces:
+            sys.exit(f"no face found in {path}")
+        found.append(max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1])))
+    src = found[0]
+    if len(found) > 1:
+        src["embedding"] = np.mean([f.normed_embedding for f in found], axis=0)
 
     def swap(frame):
         for f in fa.get(frame):
             frame = swapper.get(frame, f, src, paste_back=True)
+            if enhance is not None:
+                frame = enhance(frame, f)
         return frame
     return swap
 
