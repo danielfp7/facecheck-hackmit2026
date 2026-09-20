@@ -132,6 +132,14 @@ Only swap faces of teammates who have agreed to it. Call the enrolled person the
 
 ```sh
 attack/setup.sh      # once; downloads ~600 MB of models and a bundled ffmpeg
+uv run --project server attack/live.py --source victim.jpg
+```
+
+`attack/live.py` is the simplest way: the same swap model (inswapper_128) in a plain full-screen window, with nothing to click. Space turns the swap on and off, `+`/`-` zoom in so the phone can be shown a life-size eye, `h` shows the frame rate, `q` quits. Run it from the Terminal app: macOS gives camera permission per app and refuses anything started from an editor. If it still can't read the camera, turn Terminal on under System Settings > Privacy & Security > Camera.
+
+Deep-Live-Cam's own app is the alternative:
+
+```sh
 attack/run.sh
 ```
 
