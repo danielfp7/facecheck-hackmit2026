@@ -87,9 +87,9 @@ async function poll() {
   try {
     const enrolled = (await api(`/users/${encodeURIComponent(user())}`)).enrolled;
     $("btnTest").hidden = !enrolled;
-    $("btnEnroll").textContent = enrolled ? "Re-enroll my face" : "Enroll my face";
+    $("btnEnroll").textContent = enrolled ? "Update my profile picture" : "Create my profile picture";
     $("btnEnroll").disabled = false;
-    $("status").textContent = enrolled ? `Waiting for a sign-in request for “${user()}”…` : "Enroll your face once to get started.";
+    $("status").textContent = enrolled ? `Waiting for a sign-in request for “${user()}”…` : "Create a profile picture once to get started.";
     if (!enrolled) return;
     const { request } = await api(`/auth/pending?user=${encodeURIComponent(user())}&device=web`);
     if (request && S.step === "home") {
@@ -418,7 +418,7 @@ function cameraMode(mode) {
     ring.style.width = ring.style.height = `${2 * targetIrisPx() * RING_DRAW_SCALE * cssPerPx}px`;
   }
   $("camBanner").innerHTML = selfie
-    ? `<b>${S.enrolling ? "Enroll: look at the camera" : "Look at the camera"}</b>${trackerReady() ? "The photo takes itself once your face fills the outline." : "Lean in until your face fills the outline."}`
+    ? `<b>${S.enrolling ? "Profile picture: look at the camera" : "Look at the camera"}</b>${trackerReady() ? "The photo takes itself once your face fills the outline." : "Lean in until your face fills the outline."}`
     : `<b>Put one eye in the outline</b>Line the coloured part of your eye up with the circle, so it fills it.${trackerReady() ? " The check starts on its own." : ""}<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
   startTracking(selfie ? "selfie" : "close");
 }

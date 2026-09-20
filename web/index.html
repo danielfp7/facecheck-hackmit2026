@@ -419,7 +419,7 @@ const COPY = [
   ["selfie does not match", "The selfie doesn't match the enrolled approver's face.", "Not the enrolled approver"],
   ["no selfie uploaded", "No selfie came with this check, so there was no face to compare.", "No selfie to compare"],
   ["no face found in the selfie", "No face was found in the selfie.", "No face in the selfie"],
-  ["not enrolled", "This account hasn't enrolled a face with FaceCheck yet.", "Not enrolled"],
+  ["not enrolled", "This account has no FaceCheck profile picture yet.", "No profile picture"],
   ["ambient light", "The room is too bright for the screen's light to show on the face. Try somewhere dimmer.", "Room too bright"],
   ["too few frames", "The camera didn't deliver enough frames during the flashes.", "Too few camera frames"],
   ["dropped camera frames", "Too many camera frames were dropped during the check.", "Too many dropped frames"],
@@ -608,7 +608,7 @@ async function signIn(device) {
     const enrolled = (await api(`/users/${encodeURIComponent(u)}`)).enrolled;
     if (!enrolled) {
       if (tab) tab.location = `/app/?user=${encodeURIComponent(u)}`;
-      renderIdle({ title: `“${u}” hasn't enrolled with FaceCheck yet`, detail: `Enroll a face once in the FaceCheck app${tab ? " (it just opened in a new tab)" : ""}, then come back and verify.` });
+      renderIdle({ title: `“${u}” has no FaceCheck profile picture yet`, detail: `Create a profile picture once in the FaceCheck app${tab ? " (it just opened in a new tab)" : ""}, then come back and verify.` });
       return;
     }
     const req = await api("/auth/requests", { method: "POST", headers: { "Content-Type": "application/json" },
