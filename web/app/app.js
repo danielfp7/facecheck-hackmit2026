@@ -244,7 +244,13 @@ const HOLD_S = 0.6;                 // how long a good pose must hold before it 
 const SELFIE_MIN_S = 2.0;           // and the selfie waits at least this long either way, so
                                     // the step is legible instead of firing the moment it opens
 const LOST_GRACE_S = 0.9;           // keep the last reading this long after losing the face
-const SELFIE_MIN_FACE = 0.32;       // face height as a fraction of frame: "fills the outline"
+// The selfie oval is a target too: the face has to be lined up inside it, not merely big
+// enough somewhere in frame. Checking only size let people sit with their chin under the
+// camera, which passed the selfie and then failed continuity on the way in to the eye.
+const SELFIE_OVAL_VH = 0.58;        // oval height, matching .guide.selfie in camera.css
+const SELFIE_OVAL_VW = 0.44;
+const SELFIE_FILL = [0.52, 1.12];   // face height as a fraction of the oval's
+const SELFIE_OFF = 0.30;            // centre offset allowed, as a fraction of the oval's half-size
 const IN_OUTLINE_FRAC = 0.30;       // eye must sit within this fraction of the ring's radius
 const SIZE_TOL = 0.28;              // and its iris within this fraction of the ring's size
 const RING_DRAW_SCALE = 0.8;        // how big the ring is drawn, relative to that iris
@@ -328,15 +334,28 @@ function startTracking(phase) {
 
     const { eye, box, mm } = T.last;
     if (phase === "selfie") {
-      const fill = box.h / video.videoHeight;
-      guide.classList.toggle("locked", fill >= SELFIE_MIN_FACE);
-      if (fill < SELFIE_MIN_FACE) {
+      // The oval is drawn in CSS pixels over a cover-fitted video; convert it to video pixels.
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const cssPerPx = Math.max(innerWidth / vw, innerHeight / vh);
+      const ovalH = (SELFIE_OVAL_VH * innerHeight) / cssPerPx;
+      const ovalW = (SELFIE_OVAL_VW * innerHeight) / cssPerPx;
+      const dx = Math.abs(box.x + box.w / 2 - vw / 2) / (ovalW / 2);
+      const dy = Math.abs(box.y + box.h / 2 - vh / 2) / (ovalH / 2);
+      const fill = box.h / ovalH;
+      const centred = dx <= SELFIE_OFF && dy <= SELFIE_OFF;
+      const sized = fill >= SELFIE_FILL[0] && fill <= SELFIE_FILL[1];
+      guide.classList.toggle("locked", centred && sized);
+      if (!sized) {
         T.goodSince = null;
-        setHud("hunting", "Closer", `${Math.round(mm)} mm away`);
+        setHud("warn", fill < SELFIE_FILL[0] ? "Closer" : "Back off a little",
+               `${Math.round(mm)} mm \u2014 fill the outline`);
+      } else if (!centred) {
+        T.goodSince = null;
+        setHud("warn", "Centre your face", `${Math.round(mm)} mm \u2014 line up with the outline`);
       } else {
         if (T.goodSince == null) T.goodSince = t;
         const ready = t - T.goodSince >= HOLD_S && t - T.startedAt >= SELFIE_MIN_S;
-        setHud("good", ready ? "Hold it" : "Hold still", `${Math.round(mm)} mm away`);
+        setHud("good", ready ? "Hold it" : "Hold still", `${Math.round(mm)} mm \u2014 in the outline`);
         if (ready) { stopTracking(); shutter(); return; }
       }
       T.raf = requestAnimationFrame(tick);
