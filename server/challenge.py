@@ -26,8 +26,11 @@ COLORS = {
     "blue": (35, 110, 245),
     "white": (255, 255, 255),
 }
-# Colors a shape can be drawn in.
-LIT = ("red", "green", "blue", "white")
+# Colors a shape can be drawn in. White is defined above but not used: the reflection is a
+# specular highlight, so it saturates the sensor and every colour measures pulled towards
+# neutral. Green comes back as (0.29,0.37,0.33) rather than (0,1,0), which is so close to
+# white's (0.32,0.33,0.35) that a green-to-white step carried no signal, only noise.
+LIT = ("red", "green", "blue")
 
 # Seizure safety: with >= 0.34 s per state the screen makes at most ~1.5 flashes
 # per second (a flash is a pair of opposing transitions), under the limit of 3.

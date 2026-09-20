@@ -29,6 +29,9 @@ CORNEA_FOCAL_MM = 3.9          # R/2 for a 7.8 mm cornea
 IRIS_DIAMETER_MM = 11.7
 LOCALIZE_W = 1080              # localisation runs with the frame's short side at most this
 DRIFT_PX = 50                  # eye drift tolerated between states, at LOCALIZE_W scale. 70 was tried
+# How far a reflection may sit from where the others landed, in iris radii, before it is
+# treated as some other highlight. Real flashes cluster within ~0.05; strays land 0.4-0.5 out.
+GLINT_DRIFT_IR = 0.35
                                # and locks onto the wrong spot on a real capture; don't widen without data.
 CROP_HALF = 260                # eye crop half-size, at LOCALIZE_W scale
 MIN_READABLE_SPAN_PX = 18      # below this the outline can't be told apart; score layout only
@@ -433,6 +436,18 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
     for colour in {p["s"].shape_color for p in per}:
         idx = np.array([i for i, p in enumerate(per) if p["s"].shape_color == colour])
         valid[idx] = peaks[idx] >= 0.25 * np.median(peaks[idx])
+
+    # The eye barely moves between flashes, so every reflection should sit in about the same
+    # spot in the iris. One that does not is a different highlight: a lamp behind the camera,
+    # a tear film glint, whatever was brightest when the real one was faint. Letting it
+    # through poisons that flash's colour. Seen on real captures: six flashes clustered
+    # within 0.05 iris radii and one landed 0.5 away, dragging a clean run under the bar.
+    # Dimmer flashes lose this race most often, which is why it showed up once blue and red
+    # joined the sequence.
+    if valid.sum() >= 3:
+        mu, mv = np.median(us[valid]), np.median(vs[valid])
+        stray = np.hypot(us - mu, vs - mv) > GLINT_DRIFT_IR
+        valid &= ~stray
     for so, ok in zip(states_out, valid):
         so["valid"] = bool(ok)
     if valid.sum() < max(4, int(np.ceil(0.6 * len(per)))):

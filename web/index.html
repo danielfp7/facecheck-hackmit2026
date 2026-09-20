@@ -398,7 +398,7 @@ function appUrl(req) {
 // ---------- copy: the server's reason -> plain English (same table as the FaceCheck results page) ----------
 // [substring of the server's reason, full sentence, short label]. First match wins, so specific keys come first.
 const COPY = [
-  ["live human, matching", "A live person, and the enrolled approver.", "Live, and the enrolled approver"],
+  ["live human, matching", "A live person, and the approver in the profile picture.", "Live, and the approver"],
   ["flat screen or print", "The reflection is far too large for a human eye: a flat screen or a print, not a person.", "Reflection too large for an eye"],
   ["reflection is far too large", "The reflection is far too large for a human eye: a flat screen or a print, not a person.", "Reflection too large for an eye"],
   ["not inside an iris", "The screen's reflection isn't inside an iris, so it isn't coming from an eye.", "Reflection isn't inside an iris"],
@@ -416,7 +416,7 @@ const COPY = [
   ["frames are missing", "The camera feed was interrupted between the selfie and the eye check.", "Camera feed was interrupted"],
   ["camera was interrupted", "The app was left, or the camera was interrupted, between the selfie and the eye check.", "The sitting was interrupted"],
   ["too long between", "Too much time passed between the selfie and the eye check.", "Too long after the selfie"],
-  ["selfie does not match", "The selfie doesn't match the enrolled approver's face.", "Not the enrolled approver"],
+  ["selfie does not match", "The selfie doesn't match the approver's profile picture.", "Not the approver"],
   ["no selfie uploaded", "No selfie came with this check, so there was no face to compare.", "No selfie to compare"],
   ["no face found in the selfie", "No face was found in the selfie.", "No face in the selfie"],
   ["not enrolled", "This account has no FaceCheck profile picture yet.", "No profile picture"],
@@ -446,7 +446,7 @@ const ICON = {
 // What FaceCheck says, and what the bank does about it.
 const VERDICT = {
   verified:     { tone: "ok",   title: "Live human verified", outcome: "Wire released",
-                  note: "A live person matching the enrolled approver confirmed this transfer. Queued for SWIFT release; Finance operations notified.",
+                  note: "A live person matching the approver's profile picture confirmed this transfer. Queued for SWIFT release; Finance operations notified.",
                   chip: "Released", step: "Live person confirmed", release: "Queued for SWIFT" },
   unverified:   { tone: "bad",  title: "Not a live human", outcome: "Transfer blocked",
                   note: "FaceCheck could not confirm a live human at the camera. The wire is held, Security has been notified, and the CFO is being called back on a known number.",
@@ -512,7 +512,7 @@ function renderPending(req) {
                                                     : `Open FaceCheck on your phone and approve the request from ${esc(APP_NAME)}.`}</p></div></div>
     <div class="scan" aria-hidden="true"></div>
     <ol class="how">
-      <li><i>1</i><span><b>Selfie</b> <span class="dim">· matched against the enrolled face</span></span></li>
+      <li><i>1</i><span><b>Selfie</b> <span class="dim">· matched against the profile picture</span></span></li>
       <li><i>2</i><span><b>Lean in</b> <span class="dim">· one eye fills the ring; the move is watched</span></span></li>
       <li><i>3</i><span><b>Flash pattern</b> <span class="dim">· random shapes and colours, about 6 s</span></span></li>
       <li><i>4</i><span><b>Analysis</b> <span class="dim">· light on the skin, reflection in the cornea</span></span></li>
@@ -534,7 +534,7 @@ function renderDone(req) {
   const r = req.result || {};
   const v = VERDICT[r.verdict] || VERDICT.unverifiable;
   let title = v.title;
-  if (r.verdict === "unverified" && /selfie does not match/i.test(r.reason || "")) title = "Not the enrolled approver";
+  if (r.verdict === "unverified" && /selfie does not match/i.test(r.reason || "")) title = "Not the approver";
   const raw = String(r.reason || "").trim();
   const plain = friendly(raw) || (v.tone === "ok" ? COPY[0][1] : "");
   const selfie = r.capture ? `<img class="selfie" alt="Selfie from this check" src="/captures/${encodeURIComponent(r.capture)}/selfie.jpg" onerror="this.remove()">` : "";
@@ -573,22 +573,22 @@ function renderDecision(req) {
     versus = `<div class="versus">
       <div class="cell ${faceTone}">
         <div class="eyebrow">Face recognition alone</div>
-        <div class="big num">${fix2(sim)}<small>match to the enrolled face</small></div>
+        <div class="big num">${fix2(sim)}<small>match to the profile picture</small></div>
         <div class="meter"><div class="bar"><i class="fill ${facePass && !ok ? "bad" : ""}" style="width:${pct}%"></i><i class="tick" style="left:${tick}%"></i></div>
           <div class="scale num"><span>0</span><span class="pass" style="left:${tick}%">${pass.toFixed(2)} pass mark</span><span class="r">1</span></div></div>
-        <div class="say ${faceTone}">${ICON[facePass ? "ok" : "bad"]}${facePass ? `Would approve: releases ${AMOUNT}` : "Would reject: not the enrolled face"}</div>
+        <div class="say ${faceTone}">${ICON[facePass ? "ok" : "bad"]}${facePass ? `Would approve: releases ${AMOUNT}` : "Would reject: not the profile picture"}</div>
       </div>
       <div class="vs" aria-hidden="true">VS</div>
       <div class="cell ours ${v.tone}">
         <div class="eyebrow">FaceCheck live-person check</div>
         <div class="big">${esc(v.outcome)}</div>
-        <div class="sm">${esc(v.tone === "ok" ? "A live person, and the enrolled approver." : friendlyShort(r.reason))}</div>
+        <div class="sm">${esc(v.tone === "ok" ? "A live person, and the approver in the profile picture." : friendlyShort(r.reason))}</div>
         <div class="say ${v.tone}">${ICON[v.tone]}${esc(v.tone === "ok" ? "Live human confirmed" : v.tone === "bad" ? `${AMOUNT} stays in the account` : "Nothing moved")}</div>
       </div></div>`;
-    if (ok && facePass) strip = `<div class="strip ok">${ICON.ok}<span>Both agree: this is the enrolled approver, and they are live.</span></div>`;
+    if (ok && facePass) strip = `<div class="strip ok">${ICON.ok}<span>Both agree: this is the approver in the profile picture, and they are live.</span></div>`;
     else if (facePass && v.tone === "bad") strip = `<div class="strip bad">${ICON.warn}<span>Face recognition was fooled at ${fix2(sim)}. FaceCheck caught it.</span></div>`;
     else if (facePass) strip = `<div class="strip warn">${ICON.warn}<span>Face recognition would approve. FaceCheck won't until it sees proof of a live person.</span></div>`;
-    else strip = `<div class="strip flat"><span>Both reject: the selfie doesn't match the enrolled approver.</span></div>`;
+    else strip = `<div class="strip flat"><span>Both reject: the selfie doesn't match the approver's profile picture.</span></div>`;
   }
   box.innerHTML = `<div class="top"><div class="glyph">${ICON[v.tone]}</div><div><h2>${esc(v.outcome)}</h2><p>${esc(v.note)}</p></div></div>${versus}${strip}`;
   box.hidden = false;

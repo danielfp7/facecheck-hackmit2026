@@ -12,8 +12,12 @@ DATA = Path(__file__).parent / "data"
 BASELINES = DATA / "baselines.json"
 
 THRESHOLDS = {
-    "response_r2_min": 0.5,       # below: face doesn't follow the screen's light
-    "diff_score_min": 0.5,
+    # Below these the face isn't following the screen at all. Set low on purpose: in a bright
+    # room the screen is a small part of the light falling on a face, so a genuine response
+    # is real but shallow. A run under a window measured 0.41 with the trace plainly tracking
+    # the flashes. What this rejects is a face that does not respond, which lands near 0.
+    "response_r2_min": 0.3,
+    "diff_score_min": 0.3,
     # Genuine lag is display + camera pipeline, calibrated per device model.
     # Literature puts an adaptive deepfake pipeline at +150-300 ms end to end,
     # and genuine jitter at 1-2 frames, so +100 ms sits between the two.
@@ -24,10 +28,12 @@ THRESHOLDS = {
     "shape_accuracy_min": 0.6,    # chance is 0.33 with three shapes
     "position_corr_min": 0.7,
     "color_score_min": 0.5,
-    # With everything centred, colour is the challenge, so it has to clear a higher bar.
-    # Measured on real captures: genuine 0.72-1.00, and a face swap cannot mirror the screen
-    # at all, so it never gets a colour sequence to score.
-    "color_score_alone_min": 0.62,
+    # What colour is for: confirming the reflection really is tracking the screen, rather than
+    # a lamp or a tear-film highlight that happens to sit in the iris. It is not what
+    # separates a live eye from a photo of one; the cornea-sized geometry check does that.
+    # Measured on genuine captures it runs 0.53-0.92 and an uncorrelated blob scores near 0,
+    # so the bar sits well under the genuine range.
+    "color_score_alone_min": 0.40,
     "face_similarity_min": 0.35,
     "max_dropped_frames": 6,
     # Partial face in the eye-check frames vs the selfie. Measured: same person
@@ -136,7 +142,7 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
         unverifiable.append(identity.get("reason", "no face found in the selfie"))
         tiles.append(_tile("Face match", "yellow", "No face", identity.get("reason", "")))
     elif identity["similarity"] < T["face_similarity_min"]:
-        failures.append("selfie does not match the enrolled face")
+        failures.append("selfie does not match the profile picture")
         tiles.append(_tile("Face match", "red", f"{identity['similarity']:.2f}", f"needs {T['face_similarity_min']:.2f}"))
     else:
         tiles.append(_tile("Face match", "green", f"{identity['similarity']:.2f}", f"needs {T['face_similarity_min']:.2f}"))
@@ -211,5 +217,5 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
     elif unverifiable:
         verdict, reason = "unverifiable", unverifiable[0]
     else:
-        verdict, reason = "verified", "live human, matching the enrolled face"
+        verdict, reason = "verified", "live human, matching the profile picture"
     return {"verdict": verdict, "reason": reason, "all_reasons": failures + unverifiable, "tiles": tiles}

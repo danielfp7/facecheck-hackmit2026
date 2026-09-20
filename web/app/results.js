@@ -22,7 +22,7 @@
   const SHAPE_SPAN = 0.75;                                  // web client: shape spans 75% of the screen height
   const TITLE = { verified: "Verified", unverified: "Not verified", unverifiable: "Couldn't verify" };
   const TONE = { verified: "ok", unverified: "bad", unverifiable: "warn" };
-  const FALLBACK_REASON = { verified: "Live human, matching the enrolled face.", unverified: "This check did not pass.", unverifiable: "The check couldn't be completed." };
+  const FALLBACK_REASON = { verified: "Live human, matching the profile picture.", unverified: "This check did not pass.", unverifiable: "The check couldn't be completed." };
   const STATUS = { green: "ok", yellow: "warn", red: "bad" };
   const STATUS_WORD = { ok: "Pass", warn: "Inconclusive", bad: "Fail" };
   const WIDE = new Set(["Light response", "Eye reflection"]);
@@ -30,7 +30,7 @@
   // What each check looks at, and why a face swap fails it.
   const EXPLAIN = {
     "Light response": "Skin lights up the instant the screen does. A deepfake has to see the flash, redraw the face and send it, so it arrives late.",
-    "Face match": "The selfie against the face enrolled for this account. This is the one check a face swap is built to pass, which is why it is never enough on its own.",
+    "Face match": "The selfie against this account's profile picture. This is the one check a face swap is built to pass, which is why it is never enough on its own.",
     "Continuity": "The same face has to stay on camera from the selfie all the way in to the eye check. A swap that holds at arm's length falls apart when the eye fills the frame.",
     "Vibration": "The phone buzzes at random moments and the camera has to see the shake the motion sensor felt. A video fed into the phone never shakes.",
     "Heartbeat": "Skin colour pulses faintly with every heartbeat. Weak evidence on its own, so it never decides a check.",
@@ -185,7 +185,7 @@
     // one sentence that says what just happened
     let note;
     if (mode === "fooled") note = `Face recognition scored this face ${simText} against a ${PASS_MARK} pass mark and would have let them in. FaceCheck ${verdict === "unverified" ? "rejected it" : "held it back"}: ${lower(sentence(r.reason)) || "a liveness check did not pass."}`;
-    else if (mode === "agree-pass") note = `Both agree. The selfie matches the enrolled face (${simText} against a ${PASS_MARK} pass mark) and ${unsure.length ? "no liveness check failed" : "every liveness check passed"}.`;
+    else if (mode === "agree-pass") note = `Both agree. The selfie matches the profile picture (${simText} against a ${PASS_MARK} pass mark) and ${unsure.length ? "no liveness check failed" : "every liveness check passed"}.`;
     else if (mode === "agree-fail") note = `Face recognition would have rejected this too: ${simText} against a ${PASS_MARK} pass mark.`;
     else note = `Face recognition had nothing to score${faceTile && faceTile.detail ? ` (${lower(faceTile.detail)})` : ""}, so only the liveness checks count here.`;
 

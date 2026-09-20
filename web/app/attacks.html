@@ -139,7 +139,7 @@
 
   // Same mapping as results.js: server reason -> plain English. First match wins.
   const COPY = [
-    ["live human, matching", "A live person, and the same person who enrolled."],
+    ["live human, matching", "A live person, and the person in the profile picture."],
     ["flat screen or print", "The reflection is far too large for a human eye. This is a flat screen or a print."],
     ["reflection is far too large", "The reflection is far too large for a human eye. This is a flat screen or a print."],
     ["not inside an iris", "The reflection isn't inside an iris, so it isn't coming from an eye."],
@@ -157,10 +157,10 @@
     ["frames are missing", "The camera feed was interrupted between the selfie and the eye check, so it wasn't one continuous sitting."],
     ["camera was interrupted", "The app was left, or the camera was interrupted, between the selfie and the eye check."],
     ["too long between", "Too much time passed between the selfie and the eye check."],
-    ["selfie does not match", "The selfie doesn't match the enrolled face."],
-    ["no selfie uploaded", "No selfie came with this check, so there was no face to compare with the enrolled one."],
+    ["selfie does not match", "The selfie doesn't match the profile picture."],
+    ["no selfie uploaded", "No selfie came with this check, so there was no face to compare with the profile picture."],
     ["no face found in the selfie", "No face was found in the selfie."],
-    ["not enrolled", "This user hasn't enrolled a face yet."],
+    ["not enrolled", "This user has no profile picture yet."],
     ["ambient light", "The room is too bright for the screen's light to show on the face. Try somewhere dimmer."],
     ["too few frames", "The camera didn't deliver enough frames during the flashes."],
     ["dropped camera frames", "Too many camera frames were dropped during the check."],
@@ -274,7 +274,7 @@
     $("nFooled").textContent = fooled;
     $("stats").hidden = false;
     $("lede").textContent = attacks.length
-      ? "Every attack below wore the enrolled person's face in real time using a free, open-source face-swap model."
+      ? "Every attack below wore the profile picture's face in real time using a free, open-source face-swap model."
       : "No attacks have been recorded yet. Run one with attack/live.py --serve and the app's ?inject mode.";
     $("attackCount").textContent = attacks.length ? `${caught} of ${attacks.length} caught` : "";
     const passed = real.filter((c) => c.verdict === "verified").length;
