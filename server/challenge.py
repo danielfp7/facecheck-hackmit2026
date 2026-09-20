@@ -2,7 +2,7 @@
 
 The server owns the random sequence so a replayed recording can never match it.
 A state is what the phone shows full-screen for `duration_s`:
-  shape (triangle/square/circle) x color x position, on a background color.
+  shape (triangle/square/circle) x color, drawn in the middle of the screen.
 Default polarity is a bright shape on black; `inverse=True` gives a black shape
 on a colored background (Tab 1's other reading of "black, red, green").
 """
@@ -15,13 +15,19 @@ from dataclasses import dataclass, asdict, field
 SHAPES = ("triangle", "square", "circle")
 POSITIONS = ("top", "middle", "bottom")
 
-# Orange-red, not pure red: R/(R+G+B) = 0.68 stays under the 0.8 "saturated red"
-# threshold in the WCAG 2.3.1 red-flash rule.
+# Four well-separated colors carry the challenge. Orange-red, not pure red:
+# R/(R+G+B) = 0.68 stays under the 0.8 "saturated red" threshold in the WCAG 2.3.1
+# red-flash rule. Their chromaticities sit far apart, which is what the server scores:
+#   red (.68,.21,.11)  green (0,1,0)  blue (.09,.28,.63)  white (.33,.33,.33)
 COLORS = {
     "black": (0, 0, 0),
     "red": (255, 80, 40),
     "green": (0, 255, 0),
+    "blue": (35, 110, 245),
+    "white": (255, 255, 255),
 }
+# Colors a shape can be drawn in.
+LIT = ("red", "green", "blue", "white")
 
 # Seizure safety: with >= 0.34 s per state the screen makes at most ~1.5 flashes
 # per second (a flash is a pair of opposing transitions), under the limit of 3.
@@ -96,9 +102,12 @@ def generate(n_shapes: int = 7, state_s: float = 0.4, inverse: bool = False,
              seed: str | None = None, haptics: bool = True) -> Challenge:
     """Random sequence: black, shape, shape, black, shape, ... about 4-5 s total.
 
-    Consecutive shape states always differ in color so every transition produces
-    a chroma step for the lag check, and black states are interleaved as the
-    ambient baseline for the corneal check.
+    Every shape is drawn in the middle of the screen. Off-centre shapes were tried and
+    dropped: up close the cornea only mirrors a narrow cone, so a shape near the screen's
+    edge reflects off the visible part of the eye and reads as a miss. The challenge is
+    carried by colour and outline instead, which is why there are four colours rather
+    than two. Consecutive shape states always differ in colour, so every transition is a
+    chroma step the lag check can use, and black states are the corneal check's baseline.
     """
     state_s = max(state_s, MIN_STATE_S)
     nonce = seed or secrets.token_hex(16)
@@ -112,15 +121,19 @@ def generate(n_shapes: int = 7, state_s: float = 0.4, inverse: bool = False,
     add(None, "black", "black", "middle")
     last_color = None
     last_shape = None
-    # Every position appears about equally often, in random order. Independent draws can
-    # come out 6-of-7 the same (seen on a real run), which leaves the position score
-    # hanging on a single flash.
-    positions = [POSITIONS[i % len(POSITIONS)] for i in range(n_shapes)]
-    rng.shuffle(positions)
+    # Every colour appears about equally often, in random order. Independent draws can come
+    # out lopsided, which leaves the colour score hanging on a couple of transitions.
+    colors = [LIT[i % len(LIT)] for i in range(n_shapes)]
+    rng.shuffle(colors)
     for i in range(n_shapes):
-        color = rng.choice([c for c in ("red", "green") if c != last_color])
+        color = colors[i]
+        if color == last_color:                       # never two of the same in a row
+            swap = next((j for j in range(i + 1, n_shapes) if colors[j] != color), None)
+            if swap is not None:
+                colors[i], colors[swap] = colors[swap], colors[i]
+                color = colors[i]
         shape = rng.choice([s for s in SHAPES if s != last_shape])
-        pos = positions[i]
+        pos = "middle"
         if inverse:
             add(shape, "black", color, pos)
         else:

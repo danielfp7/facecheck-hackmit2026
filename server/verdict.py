@@ -24,6 +24,10 @@ THRESHOLDS = {
     "shape_accuracy_min": 0.6,    # chance is 0.33 with three shapes
     "position_corr_min": 0.7,
     "color_score_min": 0.5,
+    # With everything centred, colour is the challenge, so it has to clear a higher bar.
+    # Measured on real captures: genuine 0.72-1.00, and a face swap cannot mirror the screen
+    # at all, so it never gets a colour sequence to score.
+    "color_score_alone_min": 0.62,
     "face_similarity_min": 0.35,
     "max_dropped_frames": 6,
     # Partial face in the eye-check frames vs the selfie. Measured: same person
@@ -91,13 +95,25 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
     else:
         # The outline only counts when the reflection spans enough pixels to read it;
         # position and color always count.
-        use_shape = shape_mode == "shape" or (shape_mode == "auto" and cornea.get("shape_readable"))
-        shape_ok = not use_shape or (cornea.get("shape_accuracy") or 0) >= T["shape_accuracy_min"]
-        pos_ok = cornea["position_corr"] >= T["position_corr_min"]
-        col_ok = cornea["color_score"] >= T["color_score_min"]
-        summary = f"position {cornea['position_corr']:.2f}, color {cornea['color_score']:.2f}"
-        if use_shape:
-            summary = f"shapes {(cornea.get('shape_accuracy') or 0):.0%}, " + summary
+        # Shapes are centred now, so usually there is no position to read and the colour
+        # sequence carries the challenge. Older captures that moved the shape still score it.
+        use_pos = cornea.get("position_varied") and cornea.get("position_corr") is not None
+        pos_ok = not use_pos or cornea["position_corr"] >= T["position_corr_min"]
+        col_ok = cornea["color_score"] >= (T["color_score_min"] if use_pos else T["color_score_alone_min"])
+        # The outline is reported but never decisive on its own. Measured on real captures it
+        # reads 43-100% correct against 33% for a guess: real evidence, too noisy to reject a
+        # person on. It is a few dozen pixels of a blurred mirror image, and how well it reads
+        # depends on eye shape, lashes and how wide the eye is open. The colour sequence is
+        # what an attacker would have to reproduce, and that reads 0.70-0.91 on real captures.
+        readable = shape_mode == "shape" or (shape_mode == "auto" and cornea.get("shape_readable"))
+        shape_acc = cornea.get("shape_accuracy")
+        use_shape = readable and use_pos            # only the old position protocol gates on it
+        shape_ok = not use_shape or (shape_acc or 0) >= T["shape_accuracy_min"]
+        summary = f"color {cornea['color_score']:.2f}"
+        if use_pos:
+            summary = f"position {cornea['position_corr']:.2f}, " + summary
+        if readable and shape_acc is not None:
+            summary = f"shapes {shape_acc:.0%}, " + summary
         where = f"{cornea['reflection_width_mm']:.1f} mm wide at {cornea['distance_mm']:.0f} mm"
         if not cornea["geometry_ok"]:
             if not cornea.get("inside_iris", True):
@@ -111,7 +127,8 @@ def decide(lag: dict, cornea: dict, identity: dict, meta: dict, shape_mode: str 
             failures.append("eye reflection does not match the displayed " + "/".join(what))
             tiles.append(_tile("Eye reflection", "red", "Mismatch", summary))
         else:
-            head = f"{cornea['position_accuracy']:.0%} of positions read"
+            head = (f"{cornea['position_accuracy']:.0%} of positions read" if use_pos
+                    else f"{cornea['color_score']:.0%} colour match")
             tiles.append(_tile("Eye reflection", "green", head, f"{summary}; {where}"))
 
     # Identity

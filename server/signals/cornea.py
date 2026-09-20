@@ -435,7 +435,7 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
         valid[idx] = peaks[idx] >= 0.25 * np.median(peaks[idx])
     for so, ok in zip(states_out, valid):
         so["valid"] = bool(ok)
-    if valid.sum() < max(4, int(np.ceil(0.6 * len(per)))) or np.ptp(sent_y[valid]) == 0:
+    if valid.sum() < max(4, int(np.ceil(0.6 * len(per)))):
         return {"ok": False, "reason": "the eye reflection was missing in too many flashes (keep the eye open and still)",
                 "valid_states": int(valid.sum())}
 
@@ -446,31 +446,43 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
     # Measured -0.994 on a real Safari run. Requiring the sign halves what a guess can score.
     axis = screen.get("position_axis", "y")
     along, across = (us, vs) if axis == "x" else (vs, us)
-    position_corr = float(np.corrcoef(along[valid], sent_y[valid])[0, 1]) if np.ptp(along[valid]) > 1e-6 else 0.0
-    position_corr_signed = position_corr
-    if axis == "x":
-        position_corr = -position_corr
-    # Decode each state's level from the fitted line, for the results tile.
-    slope, icpt = np.polyfit(sent_y[valid], along[valid], 1)
-    levels = {name: icpt + slope * y for name, y in POSITION_Y.items()}
-    for so, v in zip(states_out, along):
-        so["decoded_position"] = min(levels, key=lambda n: abs(levels[n] - v))
+    # Shapes are drawn in the middle now, so there is usually no position to read. Up close
+    # the cornea only mirrors a narrow cone and a shape near the screen's edge misses the
+    # visible eye entirely, which read as a mismatch on a genuine person. Colour and outline
+    # carry the challenge instead. Older captures that did move the shape are still scored.
+    position_varied = bool(np.ptp(sent_y[valid]) > 1e-6)
+    position_corr = position_corr_signed = None
+    if position_varied:
+        position_corr = float(np.corrcoef(along[valid], sent_y[valid])[0, 1]) if np.ptp(along[valid]) > 1e-6 else 0.0
+        position_corr_signed = position_corr
+        if axis == "x":
+            position_corr = -position_corr
+        slope, icpt = np.polyfit(sent_y[valid], along[valid], 1)
+        levels = {name: icpt + slope * y for name, y in POSITION_Y.items()}
+        for so, v in zip(states_out, along):
+            so["decoded_position"] = min(levels, key=lambda n: abs(levels[n] - v))
     shape_readable = bool(temps) and all(so["decoded_shape"] != "?" for so in states_out)
     counted = [so for so in states_out if so["valid"]]
     shape_acc = float(np.mean([so["decoded_shape"] == so["sent_shape"] for so in counted])) if shape_readable else None
     for so in states_out:
-        ok_pos = so.get("decoded_position") == so["sent_position"]
+        ok_pos = (not position_varied) or so.get("decoded_position") == so["sent_position"]
         so["match"] = bool(so["valid"] and ok_pos and (not shape_readable or so["decoded_shape"] == so["sent_shape"]))
 
-    # Color from sequential differences of the red-vs-green balance, so a color cast cancels.
-    def balance(rgb):
-        return float((rgb[0] - rgb[1]) / (abs(rgb[0]) + abs(rgb[1]) + 1e-6))
-    sent_bal = {"red": balance(np.array(COLORS["red"], float)), "green": -1.0, "black": 0.0}
-    mb = np.array([balance(p["rgb"]) for p, ok in zip(per, valid) if ok])
-    sb = np.array([sent_bal[p["s"].shape_color] for p, ok in zip(per, valid) if ok])
-    dm, ds = np.diff(mb), np.diff(sb)
-    keep = np.abs(ds) > 1e-3
-    color_score = float((dm[keep] * ds[keep]).sum() / (np.linalg.norm(dm[keep]) * np.linalg.norm(ds[keep]) + 1e-9)) if keep.any() else 0.0
+    # Colour, scored in chromaticity so brightness drops out, on sequential differences so a
+    # steady colour cast from the room or the camera's white balance cancels. Works for any
+    # number of colours: red, green, blue and white sit far apart in this space.
+    def chroma(rgb):
+        v = np.asarray(rgb, float)
+        return v / max(float(v.sum()), 1e-6)
+    meas = np.array([chroma(p["rgb"]) for p, ok in zip(per, valid) if ok])
+    sent = np.array([chroma(COLORS[p["s"].shape_color]) for p, ok in zip(per, valid) if ok])
+    dm, ds = np.diff(meas, axis=0), np.diff(sent, axis=0)
+    keep = np.linalg.norm(ds, axis=1) > 1e-3
+    if keep.any():
+        a, b = dm[keep].ravel(), ds[keep].ravel()
+        color_score = float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-9))
+    else:
+        color_score = 0.0
 
     # The search above is confined to the iris, so ask instead whether the strongest blob
     # found *anywhere* near the eye was that same one. For a flat screen or print it isn't.
@@ -481,8 +493,10 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
         "ok": True,
         "shape_readable": shape_readable,
         "shape_accuracy": None if shape_acc is None else round(shape_acc, 3),
-        "position_corr": round(position_corr, 3),
-        "position_accuracy": round(float(np.mean([so["decoded_position"] == so["sent_position"] for so in counted])), 3),
+        "position_varied": position_varied,
+        "position_corr": None if position_corr is None else round(position_corr, 3),
+        "position_accuracy": (round(float(np.mean([so["decoded_position"] == so["sent_position"] for so in counted])), 3)
+                              if position_varied and counted else None),
         "valid_states": int(valid.sum()),
         "color_score": round(color_score, 3),
         "geometry_ok": geometry_ok,
@@ -494,7 +508,7 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
         "iris_radius_px": round(float(ir), 1),
         "distance_mm": round(float(distance_mm)),
         "position_axis": axis,
-        "position_corr_signed": round(position_corr_signed, 3),
+        "position_corr_signed": None if position_corr_signed is None else round(position_corr_signed, 3),
         "x_spread": round(float(np.std(across[valid])), 3),
         "states": states_out,
     }

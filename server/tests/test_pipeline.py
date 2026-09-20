@@ -65,7 +65,9 @@ def test_cornea_reads_shapes(cases, ch):
     r = cornea.analyze(cases["real"], ch, l["lag_ms"])
     assert r["ok"] and r["geometry_ok"] and r["inside_iris"]
     assert r["shape_readable"] and r["shape_accuracy"] >= 0.85
-    assert r["position_corr"] > 0.8 and r["color_score"] > 0.8
+    # Shapes are centred, so there is no position to read; colour carries the challenge.
+    assert r["position_varied"] is False and r["position_corr"] is None
+    assert r["color_score"] > 0.8
     # The iris fit doubles as a ruler: synth draws a 70 px iris radius.
     assert abs(r["iris_radius_px"] - synth.IRIS_R) < 6
 
