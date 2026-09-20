@@ -25,6 +25,7 @@ const S = {
   stream: null, track: null, selfie: null, selfieTs: null, exposureLocked: false, tsSource: "now",
   transit: { on: false, blobs: [], ts: [], timer: null },
   frames: { on: false, blobs: [], ts: [], pending: [] },
+  eye: { on: false, raf: null, last: null, closeSince: null, lostSince: null },
   aborted: null,
 };
 
@@ -143,6 +144,7 @@ async function openCamera() {
 }
 
 function closeCamera() {
+  stopEyeTracking();
   stopTransit();
   S.frames.on = false;
   if (S.stream) S.stream.getTracks().forEach((t) => t.stop());
@@ -226,6 +228,107 @@ function startFrames() {
   }
 }
 
+// ---------- live eye tracking ----------
+//
+// The ring follows the eye instead of the eye having to find the ring. We track the
+// corneal glint (the screen's own reflection), measure the iris around it, and start the
+// check by itself once the eye is close enough and holding still. Every genuine failure
+// so far has been a positioning failure ("lean in closer"), not a detection failure.
+
+const IRIS_MM = 11.7;
+const READY_HOLD_S = 0.7;        // eye must stay close and found for this long
+const LOST_GRACE_S = 1.2;        // keep the last ring this long before giving up on tracking
+
+/** Video pixels -> CSS px in the mirrored, object-fit:cover viewfinder. */
+function videoToCss(x, y) {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const scale = Math.max(innerWidth / vw, innerHeight / vh);
+  return { x: innerWidth - ((x - vw / 2) * scale + innerWidth / 2),
+           y: (y - vh / 2) * scale + innerHeight / 2, scale };
+}
+
+/** Iris radius in video px at the target distance. */
+function targetIrisPx() {
+  const pxPerMM = video.videoWidth / (2 * TARGET_DISTANCE_MM * Math.tan((ASSUMED_FOV_DEG * Math.PI) / 360));
+  return (IRIS_MM / 2) * pxPerMM;
+}
+
+// The tracker measures the whole dark eye region, not the iris alone, so it reads high.
+// Calibrated on captures with a known distance: 147 mm (the furthest that still produced a
+// clean check) came out at 4.5x the target iris radius, 118 mm at 7.6x.
+const CLOSE_ENOUGH = 4.0;
+function isClose(r) { return r >= CLOSE_ENOUGH * targetIrisPx(); }
+
+function stopEyeTracking() {
+  S.eye.on = false;
+  if (S.eye.raf) cancelAnimationFrame(S.eye.raf);
+  S.eye.raf = null;
+  S.eye.last = S.eye.closeSince = S.eye.lostSince = null;
+  $("ring").classList.remove("tracked", "near");
+}
+
+function startEyeTracking() {
+  const E = S.eye;
+  E.on = true; E.last = null; E.closeSince = null; E.lostSince = null;
+  const ring = $("ring"), want = targetIrisPx();
+  const tick = () => {
+    if (!E.on || S.step !== "camera") return;
+    let eye = null;
+    try { eye = window.findEye(video); } catch { /* tracking is optional; the button still works */ }
+    const t = now();
+    if (eye) {
+      E.lostSince = null;
+      // Smooth so the ring doesn't jitter, but follow a real move quickly.
+      E.last = E.last ? { x: 0.6 * E.last.x + 0.4 * eye.x, y: 0.6 * E.last.y + 0.4 * eye.y,
+                          r: 0.7 * E.last.r + 0.3 * eye.r } : eye;
+    } else if (E.last && E.lostSince == null) {
+      E.lostSince = t;
+    }
+    const show = E.last && (!E.lostSince || t - E.lostSince < LOST_GRACE_S);
+    if (show) {
+      const { x, y, scale } = videoToCss(E.last.x, E.last.y);
+      const d = 2 * (E.last.r / 3.0) * scale;   // draw at about iris size
+      ring.style.transform = `translate(-50%, -50%)`;
+      ring.style.left = `${x}px`;
+      ring.style.top = `${y}px`;
+      ring.style.width = ring.style.height = `${d}px`;
+      ring.classList.add("tracked");
+      const close = isClose(E.last.r);
+      ring.classList.toggle("near", close);
+      if (close && !E.lostSince) {
+        if (E.closeSince == null) E.closeSince = t;
+        const held = t - E.closeSince;
+        setBanner(held >= READY_HOLD_S ? "hold" : "steady");
+        if (held >= READY_HOLD_S) { stopEyeTracking(); ready(); return; }
+      } else {
+        E.closeSince = null;
+        setBanner("closer");
+      }
+    } else {
+      E.closeSince = null;
+      ring.classList.remove("tracked", "near");
+      ring.style.left = ring.style.top = "50%";
+      ring.style.width = ring.style.height = `${2 * want * Math.max(innerWidth / video.videoWidth, innerHeight / video.videoHeight)}px`;
+      setBanner("find");
+    }
+    E.raf = requestAnimationFrame(tick);
+  };
+  E.raf = requestAnimationFrame(tick);
+}
+
+const BANNERS = {
+  find: ["Bring one eye toward the camera", "Looking for your eye. Keep the camera on your face."],
+  closer: ["Closer", "Keep coming until the ring locks on."],
+  steady: ["Hold still", "Almost there."],
+  hold: ["Got it", "Starting the check. Keep your eye right there."],
+};
+function setBanner(key) {
+  if (S.eye.banner === key) return;
+  S.eye.banner = key;
+  const [a, b] = BANNERS[key];
+  $("camBanner").innerHTML = `<b>${a}</b>${b}<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
+}
+
 // ---------- the flow ----------
 
 function cameraMode(mode) {
@@ -244,9 +347,14 @@ function cameraMode(mode) {
     const cssPerPx = Math.max(innerWidth / video.videoWidth, innerHeight / video.videoHeight);
     ring.style.width = ring.style.height = `${11.7 * pxPerMM * cssPerPx}px`;
   }
-  $("camBanner").innerHTML = selfie
-    ? `<b>${S.enrolling ? "Enroll: take a selfie" : "Take a selfie"}</b>Lean in until your face fills the outline.`
-    : `<b>Keep the camera on your face</b>Without looking away, lean in until the colored part of one eye fills the ring, about 6 to 7 inches (17 cm) from the camera.<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
+  if (selfie) {
+    stopEyeTracking();
+    $("camBanner").innerHTML = `<b>${S.enrolling ? "Enroll: take a selfie" : "Take a selfie"}</b>Lean in until your face fills the outline.`;
+  } else {
+    S.eye.banner = null;
+    setBanner("find");
+    startEyeTracking();
+  }
 }
 
 async function begin(enrolling) {
@@ -424,82 +532,6 @@ function reset() {
   show("home");
 }
 
-// ---------- results ----------
-
-function lineChart(canvas, series) {
-  const dpr = devicePixelRatio || 1, w = canvas.clientWidth || 320, h = 120;
-  canvas.width = w * dpr; canvas.height = h * dpr;
-  const g = canvas.getContext("2d");
-  g.scale(dpr, dpr);
-  for (const s of series) {
-    const xs = s.x, ys = s.y, x0 = xs[0], x1 = xs[xs.length - 1];
-    const lo = s.lo ?? Math.min(...ys), hi = s.hi ?? Math.max(...ys), span = hi - lo || 1;
-    g.beginPath();
-    g.setLineDash(s.dash || []);
-    g.lineWidth = s.width || 2;
-    g.strokeStyle = s.color;
-    ys.forEach((y, i) => {
-      const px = ((xs[i] - x0) / (x1 - x0 || 1)) * (w - 8) + 4, py = h - 6 - ((y - lo) / span) * (h - 12);
-      i ? g.lineTo(px, py) : g.moveTo(px, py);
-    });
-    g.stroke();
-  }
-}
-
-function renderResults(r) {
-  const title = { verified: "Verified", unverified: "Not verified", unverifiable: "Couldn't verify" }[r.verdict] || r.verdict;
-  const mark = { verified: "✓", unverified: "✕", unverifiable: "?" }[r.verdict] || "";
-  const v = $("verdict");
-  v.className = "verdict " + r.verdict;
-  v.innerHTML = `<div class="mark">${mark}</div><div><h2>${title}</h2><p></p></div>`;
-  v.querySelector("p").textContent = r.reason;
-
-  const tiles = $("tiles");
-  tiles.innerHTML = "";
-  const sig = r.signals || {};
-  for (const t of r.tiles) {
-    const el = document.createElement("div");
-    el.className = "tile";
-    el.innerHTML = `<div class="name"><span class="dot ${t.status}"></span><span></span></div><div class="headline"></div><div class="detail"></div>`;
-    el.querySelector(".name span:last-child").textContent = t.name;
-    el.querySelector(".headline").textContent = t.headline;
-    el.querySelector(".detail").textContent = t.detail;
-    tiles.appendChild(el);
-
-    if (t.name === "Light response" && sig.lag?.plot) {
-      const c = el.appendChild(document.createElement("canvas")), p = sig.lag.plot, series = [];
-      [[0, "#e5484d"], [1, "#30a46c"]].forEach(([ch, color]) => {
-        const m = p.measured.map((q) => q[ch]), lo = Math.min(...m), hi = Math.max(...m);
-        series.push({ x: p.t, y: p.expected.map((q) => q[ch]), lo, hi, color, dash: [5, 4], width: 1 });
-        series.push({ x: p.t, y: m, lo, hi, color });
-      });
-      requestAnimationFrame(() => lineChart(c, series));
-    }
-    if (t.name === "Eye reflection" && sig.cornea?.states) {
-      const grid = el.appendChild(document.createElement("div"));
-      grid.className = "crops";
-      const where = { top: "left", middle: "middle", bottom: "right" };
-      for (const s of sig.cornea.states) {
-        const ok = s.match ?? s.decoded_shape === s.sent_shape;
-        const d = document.createElement("div");
-        d.className = "crop";
-        d.innerHTML = `<img alt="" src="data:image/jpeg;base64,${s.crop_jpeg_b64}"><div class="cap"></div>`;
-        const pos = sig.cornea.position_axis === "x" ? where[s.sent_position] : s.sent_position;
-        d.querySelector(".cap").innerHTML = `<span>${s.sent_color} ${s.sent_shape}, ${pos}</span><span class="${ok ? "ok" : "bad"}">${ok ? "✓" : "✕"}</span>`;
-        grid.appendChild(d);
-      }
-    }
-    if (t.name === "Face match" && r.capture) {
-      const img = el.appendChild(document.createElement("img"));
-      img.className = "selfieThumb";
-      img.alt = "";
-      img.src = `/captures/${encodeURIComponent(r.capture)}/selfie.jpg`;
-    }
-  }
-  $("timing").textContent = r.processing_s ? `Analyzed in ${r.processing_s.toFixed(1)} s` : "";
-  show("results");
-}
-
 // ---------- wiring ----------
 
 const params = new URLSearchParams(location.search);
@@ -538,6 +570,18 @@ async function openLinkedRequest() {
   }
 }
 
+/** ?replay=<capture folder>: show a saved check's results without running one. */
+async function openReplay() {
+  const name = params.get("replay");
+  if (!name) return false;
+  try {
+    const r = await api(`/captures/${encodeURIComponent(name)}/result.json`);
+    r.capture = r.capture || name;
+    renderResults(r);
+    return true;
+  } catch (e) { toast(e.message); return false; }
+}
+
 show("home");
-openLinkedRequest().then(poll);
+openReplay().then((replayed) => { if (!replayed) openLinkedRequest().then(poll); });
 setInterval(poll, 2000);

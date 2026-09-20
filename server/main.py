@@ -224,7 +224,10 @@ def verify(challenge_id: str = Form(...), meta: str = Form(...), video: UploadFi
     (cap_dir / "result.json").write_text(json.dumps(result))
 
     if request_id and request_id in requests_:
-        slim = {k: result[k] for k in ("verdict", "reason", "tiles", "capture")}
+        slim = {k: result[k] for k in ("verdict", "reason", "tiles", "capture", "processing_s")}
+        # What face recognition alone would have concluded: the relying party shows it next to the verdict.
+        slim["face_similarity"] = ((result.get("signals") or {}).get("identity") or {}).get("similarity")
+        slim["face_pass_mark"] = verdict_mod.THRESHOLDS["face_similarity_min"]
         requests_[request_id].update(status="done", result=slim)
     return result
 
@@ -235,6 +238,34 @@ def capture_selfie(name: str):
     if not (p / "selfie.jpg").exists():
         raise HTTPException(404)
     return FileResponse(p / "selfie.jpg")
+
+
+@app.get("/captures")
+def capture_list():
+    """Saved checks, newest first: what the results replay and the attack log read."""
+    out = []
+    for d in sorted(CAPTURES.iterdir(), reverse=True):
+        rj, mj = d / "result.json", d / "meta.json"
+        if not (d.is_dir() and rj.exists() and mj.exists()) or d.name.startswith("_"):
+            continue
+        try:
+            r, m = json.loads(rj.read_text()), json.loads(mj.read_text())
+        except ValueError:
+            continue
+        parts = d.name.split("_")
+        out.append({"name": d.name, "label": parts[1] if len(parts) > 2 else "", "device": m.get("device_model"),
+                    "verdict": r.get("verdict"), "reason": r.get("reason"),
+                    "face_similarity": ((r.get("signals") or {}).get("identity") or {}).get("similarity"),
+                    "has_selfie": (d / "selfie.jpg").exists()})
+    return out
+
+
+@app.get("/captures/{name}/result.json")
+def capture_result(name: str):
+    p = CAPTURES / _safe(name) / "result.json"
+    if not p.exists():
+        raise HTTPException(404)
+    return json.loads(p.read_text())
 
 
 @app.get("/health")
