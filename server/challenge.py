@@ -21,11 +21,6 @@ COLORS = {
     "black": (0, 0, 0),
     "red": (255, 80, 40),
     "green": (0, 255, 0),
-    "white": (255, 255, 255),
-    # Dim red for the pupil protocol's baseline: long wavelength drives the pupil
-    # weakly, so the eye stays dark-adapted, but it still lights the iris enough to
-    # image. Locking exposure on pure black would push ISO to its maximum.
-    "dimred": (60, 12, 6),
 }
 
 # Seizure safety: with >= 0.34 s per state the screen makes at most ~1.5 flashes
@@ -95,37 +90,6 @@ def _haptic_times(rng: random.Random, total_s: float, n: int = 3, min_gap: float
         if all(b - a >= min_gap for a, b in zip(ts, ts[1:])):
             return [round(t, 3) for t in ts]
     return [round(lo + (hi - lo) * (i + 0.5) / n, 3) for i in range(n)]
-
-
-def generate_plr(flash_s: float = 0.3, baseline_s: float = 3.0, recover_s: float = 4.0,
-                 seed: str | None = None) -> Challenge:
-    """Transient-flash protocol for the pupillary light reflex.
-
-    dim-red baseline -> brief full-screen white flash -> dark recovery.
-
-    The flash is short on purpose. The screen's own reflection lands on the pupil and
-    swamps it (the pupil reads ~58/255 during a flash against 6-12 in the dark), so the
-    pupil can only be measured once the screen is dark again. Peak constriction arrives
-    around 0.9-1.2 s, well after a 0.3 s flash has ended.
-
-    Two brief dim-red pips before the flash give signals/lag.py the transitions it needs
-    to measure the display-to-camera delay, which is what turns an observed pupil onset
-    into a neural latency. They are dim and long-wavelength so they barely move the pupil.
-    """
-    nonce = seed or secrets.token_hex(16)
-    states: list[State] = []
-
-    def add(color, dur):
-        states.append(State(len(states), None, color, color, "middle", dur))
-
-    for _ in range(2):                      # timing pips
-        add("dimred", MIN_STATE_S)
-        add("black", MIN_STATE_S)
-    add("dimred", baseline_s)               # baseline: pupil settles, exposure is locked here
-    add("white", max(flash_s, 0.05))        # the stimulus
-    add("black", recover_s)                 # constriction and recovery, measured here
-    return Challenge(id=secrets.token_hex(8), nonce=nonce, states=states,
-                     settle_color="dimred", settle_s=2.0, haptic_times_s=[])
 
 
 def generate(n_shapes: int = 7, state_s: float = 0.4, inverse: bool = False,
