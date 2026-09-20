@@ -247,10 +247,17 @@ const LOST_GRACE_S = 0.9;           // keep the last reading this long after los
 // The selfie oval is a target too: the face has to be lined up inside it, not merely big
 // enough somewhere in frame. Checking only size let people sit with their chin under the
 // camera, which passed the selfie and then failed continuity on the way in to the eye.
-const SELFIE_OVAL_VH = 0.58;        // oval height, matching .guide.selfie in camera.css
-const SELFIE_OVAL_VW = 0.44;
 const SELFIE_FILL = [0.52, 1.12];   // face height as a fraction of the oval's
 const SELFIE_OFF = 0.30;            // centre offset allowed, as a fraction of the oval's half-size
+
+/** The selfie oval in video pixels. Measured from the element, so CSS owns its size and
+ *  the phone breakpoint can change it without the alignment maths drifting out of step. */
+function ovalInVideoPx() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const cssPerPx = Math.max(innerWidth / vw, innerHeight / vh);
+  const r = $("guide").getBoundingClientRect();
+  return { w: r.width / cssPerPx, h: r.height / cssPerPx, cssPerPx };
+}
 const IN_OUTLINE_FRAC = 0.30;       // eye must sit within this fraction of the ring's radius
 const SIZE_TOL = 0.28;              // and its iris within this fraction of the ring's size
 const RING_DRAW_SCALE = 0.8;        // how big the ring is drawn, relative to that iris
@@ -334,11 +341,8 @@ function startTracking(phase) {
 
     const { eye, box, mm } = T.last;
     if (phase === "selfie") {
-      // The oval is drawn in CSS pixels over a cover-fitted video; convert it to video pixels.
       const vw = video.videoWidth, vh = video.videoHeight;
-      const cssPerPx = Math.max(innerWidth / vw, innerHeight / vh);
-      const ovalH = (SELFIE_OVAL_VH * innerHeight) / cssPerPx;
-      const ovalW = (SELFIE_OVAL_VW * innerHeight) / cssPerPx;
+      const { w: ovalW, h: ovalH } = ovalInVideoPx();
       const dx = Math.abs(box.x + box.w / 2 - vw / 2) / (ovalW / 2);
       const dy = Math.abs(box.y + box.h / 2 - vh / 2) / (ovalH / 2);
       const fill = box.h / ovalH;
