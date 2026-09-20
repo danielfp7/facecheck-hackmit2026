@@ -160,7 +160,7 @@ final class CaptureController: NSObject, AVCaptureVideoDataOutputSampleBufferDel
     /// measures the true distance from the iris anyway.
     var workingDistanceMM: Double {
         let inches = UserDefaults.standard.double(forKey: "distanceInches")
-        return (inches > 0 ? inches : 4) * 25.4
+        return (inches > 0 ? inches : 3) * 25.4
     }
 
     /// Back to fully automatic, for the selfie and positioning steps.

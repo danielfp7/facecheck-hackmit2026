@@ -382,14 +382,15 @@ def analyze(bundle: Bundle, ch: Challenge, lag_ms: float, stash: dict | None = N
 
     # Phones place the shape top/middle/bottom; a wide laptop screen has no vertical room,
     # so the web client places it left/middle/right and the reflection moves along x.
-    # A cornea mirrors left-right and whether the capture is mirrored varies by browser,
-    # so along x only the strength of the relationship is scored, not its sign.
+    # A cornea mirrors left-right and browsers deliver the camera unmirrored, so a shape on the
+    # screen's left shows up on the image's right: the relationship along x is negative.
+    # Measured -0.994 on a real Safari run. Requiring the sign halves what a guess can score.
     axis = screen.get("position_axis", "y")
     along, across = (us, vs) if axis == "x" else (vs, us)
     position_corr = float(np.corrcoef(along[valid], sent_y[valid])[0, 1]) if np.ptp(along[valid]) > 1e-6 else 0.0
     position_corr_signed = position_corr
     if axis == "x":
-        position_corr = abs(position_corr)
+        position_corr = -position_corr
     # Decode each state's level from the fitted line, for the results tile.
     slope, icpt = np.polyfit(sent_y[valid], along[valid], 1)
     levels = {name: icpt + slope * y for name, y in POSITION_Y.items()}

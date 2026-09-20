@@ -93,7 +93,7 @@ struct HomeView: View {
 struct SettingsView: View {
     @AppStorage("serverURL") private var serverURL = Flow.defaultServerURL
     @AppStorage("userName") private var userName = "daniel"
-    @AppStorage("distanceInches") private var distanceInches = 4.0
+    @AppStorage("distanceInches") private var distanceInches = 3.0
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -190,11 +190,17 @@ struct SelfieView: View {
     var body: some View {
         ZStack {
             CameraPreview(session: flow.capture.session).ignoresSafeArea()
-            Ellipse()
-                .strokeBorder(.white.opacity(0.9), style: StrokeStyle(lineWidth: 3, dash: [10, 8]))
-                .frame(width: 250, height: 340)
+            // Large on purpose: filling it puts the face close, which gives the recogniser more
+            // pixels and shortens the move in to the eye.
+            GeometryReader { geo in
+                Ellipse()
+                    .strokeBorder(.white.opacity(0.9), style: StrokeStyle(lineWidth: 3, dash: [10, 8]))
+                    .frame(width: geo.size.width * 0.84, height: geo.size.width * 0.84 * 1.32)
+                    .position(x: geo.size.width / 2, y: geo.size.height * 0.46)
+            }
+            .ignoresSafeArea()
             VStack {
-                Text(enrolling ? "Enroll: take an arm's-length selfie" : "Take an arm's-length selfie")
+                Text(enrolling ? "Enroll: fill the outline with your face" : "Fill the outline with your face")
                     .font(.headline).padding(12)
                     .background(.ultraThinMaterial, in: Capsule())
                     .padding(.top, 24)

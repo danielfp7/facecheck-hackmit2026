@@ -15,7 +15,7 @@ const SCREENS = ["home", "approve", "warning", "camera", "uploading", "results"]
 const MAX_SELFIE_TO_CHECK_S = 20;
 const SHAPE_SPAN_OF_HEIGHT = 0.75;
 const POSITION_X = { top: 0.25, middle: 0.5, bottom: 0.75 };   // server names, used as left/middle/right here
-const TARGET_DISTANCE_MM = 200;      // ~8 in: as close as a fixed-focus laptop webcam stays usable
+const TARGET_DISTANCE_MM = 165;      // ~6.5 in. People end up ~30% further than asked (322 mm on a 250 mm ask)
 const ASSUMED_FOV_DEG = 65;
 const now = () => performance.now() / 1000;
 const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
@@ -219,8 +219,8 @@ function cameraMode(mode) {
     ring.style.width = ring.style.height = `${11.7 * pxPerMM * cssPerPx}px`;
   }
   $("camBanner").innerHTML = selfie
-    ? `<b>${S.enrolling ? "Enroll: take a selfie" : "Take a selfie"}</b>Sit at your normal distance with your face inside the outline.`
-    : `<b>Keep the camera on your face</b>Without looking away, lean in until the colored part of one eye fills the ring, about 8 inches (20 cm) from the camera.<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
+    ? `<b>${S.enrolling ? "Enroll: take a selfie" : "Take a selfie"}</b>Lean in until your face fills the outline.`
+    : `<b>Keep the camera on your face</b>Without looking away, lean in until the colored part of one eye fills the ring, about 6 to 7 inches (17 cm) from the camera.<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
 }
 
 async function begin(enrolling) {

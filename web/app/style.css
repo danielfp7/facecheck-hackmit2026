@@ -41,7 +41,7 @@ button:disabled { opacity: .5; cursor: default; }
 .guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   border: 3px dashed rgba(255,255,255,.9); border-radius: 50%; pointer-events: none;
   transition: width .35s ease, height .35s ease; }
-.guide.selfie { width: 26vh; height: 36vh; }
+.guide.selfie { width: 44vh; height: 58vh; }
 .guide.close { display: none; }
 /* Iris-sized ring: a precise distance cue (sized in app.js from the camera frame). */
 .ring { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border: 3px solid #fff;
