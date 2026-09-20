@@ -1,0 +1,34 @@
+/* Camera steps, the tracking HUD and the full-screen flash stage. Owned by the check flow (app.js). */
+/* Camera */
+#camera { padding: 0; background: #000; }
+.viewfinder { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+#video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); background: #000; }
+.guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  border: 3px dashed rgba(255,255,255,.9); border-radius: 50%; pointer-events: none;
+  transition: width .35s ease, height .35s ease; }
+.guide.selfie { width: 44vh; height: 58vh; }
+.guide.close { display: none; }
+/* Iris-sized ring: a precise distance cue (sized in app.js from the camera frame). */
+.ring { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border: 3px solid #fff;
+  border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+/* Locked onto a real eye: the ring stops being a target and becomes a readout. */
+.ring.tracked { border-color: #7d9bff; border-style: solid; box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 0 22px rgba(125,155,255,.55); }
+.ring.tracked.near { border-color: #3ddc97; box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 0 26px rgba(61,220,151,.7); }
+.ring.tracked .eye { opacity: .35; }
+.ring .eye { position: absolute; left: 50%; top: 50%; width: 270%; height: 135%; transform: translate(-50%, -50%);
+  border: 2px solid rgba(255,255,255,.55); border-radius: 50%; }
+.banner { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: min(620px, 92vw);
+  background: rgba(20,23,31,.72); color: #fff; backdrop-filter: blur(10px); border-radius: 14px;
+  padding: 14px 18px; text-align: center; }
+.banner b { display: block; font-size: 20px; margin-bottom: 4px; }
+.banner small { display: block; opacity: .75; margin-top: 6px; font-size: 13px; }
+.controls { position: absolute; bottom: 28px; left: 0; right: 0; display: flex; flex-direction: column;
+  align-items: center; gap: 12px; }
+.shutter { width: 74px; height: 74px; border-radius: 50%; background: #fff; border: 5px solid rgba(0,0,0,.25); padding: 0; }
+.countdown { position: absolute; inset: 0; display: grid; place-items: center; color: #fff;
+  font-size: 160px; font-weight: 800; text-shadow: 0 4px 30px rgba(0,0,0,.6); }
+
+/* Flash stage: fills the screen, no chrome, no transitions (changes must be hard steps) */
+#stage { position: fixed; inset: 0; background: #000; z-index: 50; cursor: none; }
+#shape { position: absolute; inset: 0; width: 100%; height: 100%; }
+

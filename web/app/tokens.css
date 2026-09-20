@@ -1,0 +1,35 @@
+/* InHuman design tokens. One look everywhere: dark, minimal, instrument-like.
+   Every InHuman surface (app shell, camera HUD, results, the panel embedded in a relying
+   party's page) reads these; nothing hard-codes a colour. */
+:root {
+  --bg: #0a0c10;            /* page */
+  --surface: #11141a;       /* cards */
+  --raised: #171b23;        /* things on cards */
+  --line: #232936;          /* 1px hairlines */
+  --text: #eceff5;
+  --text-2: #9aa3b5;        /* secondary */
+  --text-3: #5f6878;        /* labels, captions */
+
+  --accent: #6e8bff;        /* brand, tracking, progress */
+  --accent-soft: rgba(110, 139, 255, .14);
+  --ok: #35d49a;            /* verified */
+  --ok-soft: rgba(53, 212, 154, .13);
+  --bad: #ff5d5d;           /* rejected */
+  --bad-soft: rgba(255, 93, 93, .13);
+  --warn: #ffb547;          /* couldn't verify */
+  --warn-soft: rgba(255, 181, 71, .13);
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  --r-sm: 10px; --r: 14px; --r-lg: 20px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --fast: 180ms; --med: 320ms; --slow: 520ms;
+}
+
+/* Small uppercase data label, used above every number. */
+.label { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.num { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
