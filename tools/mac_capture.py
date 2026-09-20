@@ -37,12 +37,11 @@ from render import render_color, render_state  # noqa: E402
 WIN = "InHuman challenge"
 
 
-def load_swapper(source_path, enhance=None):
+def load_swapper(source_path):
     """inswapper from Deep-Live-Cam's models folder, plus the source identity.
 
     source_path: one photo, or several of the same person (their embeddings are averaged,
-    which gives a steadier likeness than any single photo). enhance(frame, face) -> frame,
-    if given, runs on each face after it is swapped."""
+    which gives a steadier likeness than any single photo)."""
     import insightface
     from insightface.app import FaceAnalysis
     model = Path(__file__).resolve().parents[1] / "attack/Deep-Live-Cam/models/inswapper_128_fp16.onnx"
@@ -73,8 +72,6 @@ def load_swapper(source_path, enhance=None):
     def swap(frame):
         for f in fa.get(frame):
             frame = swapper.get(frame, f, src, paste_back=True)
-            if enhance is not None:
-                frame = enhance(frame, f)
         return frame
     return swap
 
