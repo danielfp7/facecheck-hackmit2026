@@ -14,6 +14,24 @@ A Duo-style second factor that proves a **live human** is holding the phone, not
 ## Live URL
 
 ```
+https://facecheck-jet.vercel.app
+```
+
+Vercel hosts the pages. The check itself runs on this Mac and the pages call it directly,
+because a check uploads 8-80 MB of frames and Vercel caps a proxied body at 4.5 MB. The
+server's address is baked into `web/app/config.js` and can be overridden per browser with
+`?api=https://...`, which is remembered.
+
+Redeploy after changing anything under `web/`:
+
+```sh
+./deploy-vercel.sh --prod --yes
+```
+
+### The server behind it
+
+
+```
 https://disclaimer-protecting-talked-newcastle.trycloudflare.com
 ```
 

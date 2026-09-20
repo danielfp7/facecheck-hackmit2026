@@ -10,3 +10,4 @@ ios/bin/
 .pytest_cache/
 ios/build/
 attack/faces/
+.vercel
