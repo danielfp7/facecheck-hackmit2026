@@ -117,11 +117,15 @@ def deny(rid: str):
 
 class ChallengeRequest(BaseModel):
     inverse: bool = False
+    protocol: str = "liveness"      # "liveness" = shape flashes; "plr" = pupil light reflex
 
 
 @app.post("/challenge")
 def new_challenge(req: ChallengeRequest | None = None):
-    ch = challenge_mod.generate(inverse=bool(req and req.inverse))
+    if req and req.protocol == "plr":
+        ch = challenge_mod.generate_plr()
+    else:
+        ch = challenge_mod.generate(inverse=bool(req and req.inverse))
     challenges[ch.id] = (time.time(), ch)
     for cid in [c for c, (t, _) in challenges.items() if time.time() - t > CHALLENGE_TTL_S]:
         challenges.pop(cid, None)
