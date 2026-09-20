@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#07090d">
+<link rel="icon" href="data:,">
+<title>InHuman attack log</title>
+<style>
+  :root {
+    --bg: #07090d; --surface: #0f131a; --surface2: #151a23; --hair: #232a36;
+    --text: #eef2f7; --text2: #b9c2d0; --muted: #8b96a8; --accent: #6ea8ff;
+    --ok: #3ddc97; --bad: #ff6b5e; --warn: #f2c14e;
+    --ok-rgb: 61,220,151; --bad-rgb: 255,107,94; --warn-rgb: 242,193,78; --accent-rgb: 110,168,255;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  a { color: inherit; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .wrap { width: min(1040px, 100%); margin: 0 auto; padding: 28px 16px 64px; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 26px; }
+  .back { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); text-decoration: none; padding: 6px 10px 6px 6px;
+    border-radius: 8px; transition: color 250ms var(--ease), background 250ms var(--ease); }
+  .back:hover { color: var(--text); background: rgba(255,255,255,.04); }
+  .back svg { width: 18px; height: 18px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 650; letter-spacing: -.01em; color: var(--text2); }
+  .brand svg { width: 22px; height: 22px; color: var(--accent); }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 6px 0 8px; font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: -.024em; }
+  h2 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.015em; }
+  .lede { margin: 0; max-width: 640px; font-size: 16px; color: var(--text2); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 26px 0 34px; }
+  .stat { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--hair); border-radius: 16px; padding: 20px 22px 18px; }
+  .stat .big { font-size: 46px; line-height: 1; font-weight: 600; letter-spacing: -.035em; }
+  .stat .lbl { margin-top: 8px; font-size: 13.5px; color: var(--muted); }
+  .stat.ok { box-shadow: 0 0 0 1px rgba(var(--ok-rgb), .08), 0 16px 50px -34px rgba(var(--ok-rgb), .35); }
+  .stat.ok .big { color: var(--ok); }
+  .stat.bad .big { color: var(--bad); }
+  .stat.bad { box-shadow: 0 0 0 1px rgba(var(--bad-rgb), .06), 0 16px 50px -34px rgba(var(--bad-rgb), .3); }
+  .stat.dim .big { color: var(--muted); }
+  .sectionHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 14px; }
+  .sectionHead p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .sectionHead .count { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+  section + section { margin-top: 40px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+  .card { display: block; min-width: 0; text-decoration: none; background: var(--surface); border: 1px solid var(--hair); border-radius: 16px; padding: 16px;
+    opacity: 0; animation: rise 450ms var(--ease) both; animation-delay: calc(var(--i, 0) * 60ms);
+    transition: transform 250ms var(--ease), border-color 250ms var(--ease), box-shadow 250ms var(--ease); }
+  .card:hover { transform: translateY(-2px); border-color: #2f394a; box-shadow: 0 16px 40px -20px rgba(0,0,0,.8); }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .cardTop { display: flex; align-items: center; gap: 12px; }
+  .thumb { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex: none; background: var(--surface2); border: 1px solid var(--hair);
+    transform: scaleX(-1); }
+  .thumb.none { display: grid; place-items: center; color: var(--muted); transform: none; }
+  .thumb.none svg { width: 24px; height: 24px; }
+  .who { min-width: 0; flex: 1; }
+  .kind { font-weight: 650; font-size: 15px; line-height: 1.25; letter-spacing: -.005em; }
+  .sub { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+  .pill { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 650;
+    letter-spacing: .02em; text-transform: uppercase; }
+  .pill svg { width: 12px; height: 12px; }
+  .pill.ok { color: var(--ok); background: rgba(var(--ok-rgb), .12); box-shadow: inset 0 0 0 1px rgba(var(--ok-rgb), .3); }
+  .pill.bad { color: var(--bad); background: rgba(var(--bad-rgb), .12); box-shadow: inset 0 0 0 1px rgba(var(--bad-rgb), .3); }
+  .pill.warn { color: var(--warn); background: rgba(var(--warn-rgb), .12); box-shadow: inset 0 0 0 1px rgba(var(--warn-rgb), .3); }
+  .meter { margin: 16px 0 0; }
+  .meterHead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; color: var(--muted); }
+  .meterHead b { font-weight: 600; color: var(--text2); }
+  .meterHead .num { color: var(--text); font-size: 13px; }
+  .fooled { font-weight: 650; }
+  .fooled.yes { color: var(--bad); } .fooled.no { color: var(--ok); } .fooled.na { color: var(--muted); font-weight: 500; }
+  .bar { position: relative; height: 8px; margin-top: 8px; border-radius: 999px; background: var(--surface2); border: 1px solid var(--hair); }
+  .bar i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: inherit; background: linear-gradient(90deg, rgba(var(--accent-rgb), .45), var(--accent)); }
+  .bar .tick { position: absolute; top: -4px; bottom: -4px; left: 35%; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--text); }
+  .scale { position: relative; display: flex; justify-content: space-between; margin-top: 6px; height: 14px; font-size: 10.5px; color: var(--muted); }
+  .scale .pass { position: absolute; left: 35%; transform: translateX(-50%); white-space: nowrap; }
+  .why { margin: 14px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--text2); }
+  .raw { margin: 6px 0 0; font-size: 11px; color: var(--muted); opacity: .85; overflow-wrap: anywhere; }
+  .state { padding: 40px 20px; text-align: center; color: var(--muted); border: 1px dashed var(--hair); border-radius: 16px; }
+  .state.error { color: var(--bad); border-color: rgba(var(--bad-rgb), .4); }
+  .foot { margin-top: 44px; font-size: 12.5px; color: var(--muted); text-align: center; }
+  @media (max-width: 640px) {
+    .wrap { padding: 20px 16px 48px; }
+    h1 { font-size: 28px; }
+    .stats { grid-template-columns: 1fr; gap: 10px; margin: 22px 0 28px; }
+    .stat { display: flex; align-items: baseline; gap: 14px; padding: 16px 18px; }
+    .stat .big { font-size: 36px; }
+    .stat .lbl { margin: 0; }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { .card { animation: none; opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="back" href="/app/"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4 6 10l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Back to InHuman</a>
+    <span class="brand"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z" fill="currentColor" opacity=".16"/><path d="M24 4 8 10v12c0 10 7 18 16 22 9-4 16-12 16-22V10L24 4Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="m17 24 5 5 9-10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>InHuman</span>
+  </div>
+
+  <div class="eyebrow">Attack log</div>
+  <h1>Every deepfake we threw at it</h1>
+  <p class="lede" id="lede">Loading the saved checks…</p>
+
+  <div class="stats" id="stats" hidden>
+    <div class="stat dim"><div class="big num" id="nAttacks">0</div><div class="lbl">attacks</div></div>
+    <div class="stat ok"><div class="big num" id="nCaught">0</div><div class="lbl">caught by InHuman</div></div>
+    <div class="stat bad"><div class="big num" id="nFooled">0</div><div class="lbl">fooled face recognition</div></div>
+  </div>
+
+  <section id="attacks">
+    <div class="sectionHead"><div><h2>Attacks</h2><p>The selfie on each card is the fake face, exactly as the camera saw it.</p></div><span class="count" id="attackCount"></span></div>
+    <div class="grid" id="attackGrid"></div>
+  </section>
+
+  <section id="genuine">
+    <div class="sectionHead"><div><h2>Genuine checks</h2><p>Real people, same pipeline. Rejections here are honest misses, usually someone not leaning in close enough.</p></div><span class="count" id="realCount"></span></div>
+    <div class="grid" id="realGrid"></div>
+  </section>
+
+  <p class="foot">Click any card to open its full result. Pass mark for face recognition: 0.35 cosine similarity.</p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const PASS_MARK = 0.35;
+  const $ = (id) => document.getElementById(id);
+  const fin = (v) => (typeof v === "number" && isFinite(v) ? v : null);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const sentence = (s) => { s = String(s || "").trim(); return s ? s[0].toUpperCase() + s.slice(1) + (/[.!?]$/.test(s) ? "" : ".") : ""; };
+  const fix2 = (v) => (Math.abs(v) < 0.005 ? "0.00" : v.toFixed(2));
+
+  // Same mapping as results.js: server reason -> plain English. First match wins.
+  const COPY = [
+    ["live human, matching", "A live person, and the same person who enrolled."],
+    ["flat screen or print", "The reflection is far too large for a human eye. This is a flat screen or a print."],
+    ["reflection is far too large", "The reflection is far too large for a human eye. This is a flat screen or a print."],
+    ["not inside an iris", "The reflection isn't inside an iris, so it isn't coming from an eye."],
+    ["no iris around it", "Something reflected the screen, but there was no iris around it. On a real eye the reflection sits inside the iris."],
+    ["missing in too many flashes", "The reflection in the eye went missing during too many flashes. Keep the eye open and still."],
+    ["too few usable states", "Too few flashes could be read from the eye."],
+    ["no eye reflection found", "No reflection of the screen was found in the eye. A real cornea mirrors the screen in front of it; a generated face doesn't."],
+    ["eye reflection does not match", "The reflection in the eye didn't move with the shapes on screen."],
+    ["no light response", "The face didn't change colour with the screen's flashes, so this video isn't of someone sitting in front of this screen."],
+    ["response delayed", "The face reacted to the flashes too late. That delay is the time a computer needs to draw a fake face."],
+    ["delayed by", "The face reacted to the flashes too late. That delay is the time a computer needs to draw a fake face."],
+    ["not the person in the selfie", "The face that took the selfie isn't the face that did the eye check."],
+    ["a different face appeared", "A different face appeared between the selfie and the eye check."],
+    ["camera view jumped", "The camera view jumped between the selfie and the eye check, so it wasn't one continuous move."],
+    ["frames are missing", "The camera feed was interrupted between the selfie and the eye check, so it wasn't one continuous sitting."],
+    ["camera was interrupted", "The app was left, or the camera was interrupted, between the selfie and the eye check."],
+    ["too long between", "Too much time passed between the selfie and the eye check."],
+    ["selfie does not match", "The selfie doesn't match the enrolled face."],
+    ["no selfie uploaded", "No selfie came with this check, so there was no face to compare with the enrolled one."],
+    ["no face found in the selfie", "No face was found in the selfie."],
+    ["not enrolled", "This user hasn't enrolled a face yet."],
+    ["ambient light", "The room is too bright for the screen's light to show on the face. Try somewhere dimmer."],
+    ["too few frames", "The camera didn't deliver enough frames during the flashes."],
+    ["dropped camera frames", "Too many camera frames were dropped during the check."],
+    ["no eye was found", "No eye was found, so the selfie couldn't be compared with the eye check."],
+    ["no face was visible right after", "No face was visible right after the selfie, so the move to the eye couldn't be followed."],
+    ["too fast to follow", "The move to the eye was too fast to follow. Bring the camera in steadily."],
+    ["was not recorded", "The move from the selfie to the eye wasn't recorded."],
+    ["could not be measured", "The face's response to the screen's light couldn't be measured."],
+    ["denied", "The sign-in request was denied."],
+  ];
+  function friendly(reason) {
+    const s = String(reason || "").toLowerCase();
+    for (const [key, text] of COPY) if (s.includes(key)) return text;
+    return sentence(reason);
+  }
+
+  const KIND = {
+    "inject-attack": "Injected face swap", "screen-attack": "Screen replay of a face swap", "dlc-attack": "Deep-Live-Cam face swap",
+    "synth-attack": "Synthetic attack", "replay": "Video replay", "print": "Printed photo", "real": "Genuine person", "synth-real": "Synthetic genuine",
+    "selftest": "Self test",
+  };
+  const IPHONE = { "iPhone14,2": "iPhone 13 Pro", "iPhone14,3": "iPhone 13 Pro Max", "iPhone14,4": "iPhone 13 mini", "iPhone14,5": "iPhone 13",
+    "iPhone14,7": "iPhone 14", "iPhone14,8": "iPhone 14 Plus", "iPhone15,2": "iPhone 14 Pro", "iPhone15,3": "iPhone 14 Pro Max",
+    "iPhone15,4": "iPhone 15", "iPhone15,5": "iPhone 15 Plus", "iPhone16,1": "iPhone 15 Pro", "iPhone16,2": "iPhone 15 Pro Max",
+    "iPhone17,1": "iPhone 16 Pro", "iPhone17,2": "iPhone 16 Pro Max", "iPhone17,3": "iPhone 16", "iPhone17,4": "iPhone 16 Plus" };
+  function deviceName(d) {
+    d = String(d || "");
+    if (IPHONE[d]) return IPHONE[d];
+    const web = /^web-([^-]+)-(.+)$/.exec(d);
+    if (web) return `${web[2]} on ${web[1]}`;
+    if (/^iPhone/.test(d)) return `iPhone (${d.replace(/^iPhone/, "")})`;
+    return d || "unknown device";
+  }
+  function when(name) {
+    const m = /^(\d{2})(\d{2})-(\d{2})(\d{2})/.exec(String(name || ""));
+    if (!m) return "";
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${months[+m[1] - 1] || m[1]} ${+m[2]}, ${m[3]}:${m[4]}`;
+  }
+  const ICON = {
+    ok: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5 6.5 11.5 12.5 4.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    bad: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2 11.8 11.8M11.8 4.2 4.2 11.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
+    warn: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.6v5.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="8" cy="11.9" r="1.3" fill="currentColor"/></svg>',
+    face: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 20c1.5-3.6 4.2-5.4 7.5-5.4s6 1.8 7.5 5.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  };
+
+  function card(c, i, attack) {
+    const sim = fin(c.face_similarity);
+    const fooled = sim != null && sim >= PASS_MARK;
+    const caught = c.verdict !== "verified";
+    let pill;
+    if (attack) pill = caught ? `<span class="pill ok">${ICON.ok}caught</span>` : `<span class="pill bad">${ICON.bad}missed</span>`;
+    else pill = c.verdict === "verified" ? `<span class="pill ok">${ICON.ok}passed</span>`
+      : c.verdict === "unverifiable" ? `<span class="pill warn">${ICON.warn}couldn't verify</span>` : `<span class="pill bad">${ICON.bad}rejected</span>`;
+    const thumb = c.has_selfie
+      ? `<img class="thumb" alt="" src="/captures/${encodeURIComponent(c.name)}/selfie.jpg">`
+      : `<span class="thumb none">${ICON.face}</span>`;
+    const verdictWord = attack
+      ? (fooled ? '<span class="fooled yes">fooled</span>' : sim == null ? '<span class="fooled na">no face found</span>' : '<span class="fooled no">not fooled</span>')
+      : (sim == null ? '<span class="fooled na">no face found</span>' : fooled ? '<span class="fooled no">would approve</span>' : '<span class="fooled yes">would reject</span>');
+    return `<a class="card" style="--i:${i}" href="/app/?replay=${encodeURIComponent(c.name)}">
+      <div class="cardTop">${thumb}
+        <div class="who"><div class="kind">${esc(KIND[c.label] || sentence(c.label).replace(/\.$/, "") || "Check")}</div>
+          <div class="sub">${esc(deviceName(c.device))}${when(c.name) ? ` · ${esc(when(c.name))}` : ""}</div></div>
+        ${pill}
+      </div>
+      <div class="meter">
+        <div class="meterHead"><span><b>Face recognition</b> ${sim != null ? `<span class="num">${fix2(sim)}</span>` : ""}</span>${verdictWord}</div>
+        <div class="bar">${sim != null ? `<i style="width:${(Math.min(1, Math.max(0, sim)) * 100).toFixed(1)}%"></i>` : ""}<span class="tick"></span></div>
+        <div class="scale num"><span>0</span><span class="pass">0.35 pass mark</span><span>1</span></div>
+      </div>
+      <p class="why">${esc(friendly(c.reason))}</p>
+      ${c.reason ? `<p class="raw num">${esc(c.reason)}</p>` : ""}
+    </a>`;
+  }
+
+  function fill(grid, list, attack) {
+    grid.innerHTML = list.length ? list.map((c, i) => card(c, i, attack)).join("")
+      : `<div class="state">Nothing here yet.</div>`;
+    for (const img of grid.querySelectorAll("img.thumb")) {
+      img.addEventListener("error", () => {
+        const s = document.createElement("span");
+        s.className = "thumb none";
+        s.innerHTML = ICON.face;
+        img.replaceWith(s);
+      });
+    }
+  }
+
+  async function load() {
+    let caps;
+    try {
+      const r = await fetch("/captures", { cache: "no-store" });
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      caps = await r.json();
+      if (!Array.isArray(caps)) throw new Error("unexpected response");
+    } catch (e) {
+      $("lede").textContent = "Couldn't load the saved checks.";
+      $("attackGrid").innerHTML = `<div class="state error">The server didn't answer: ${esc(e.message)}</div>`;
+      $("genuine").hidden = true;
+      return;
+    }
+    caps = caps.filter((c) => c && typeof c === "object" && c.name);
+    const attacks = caps.filter((c) => /attack/i.test(String(c.label || "")));
+    const real = caps.filter((c) => String(c.label || "") === "real");
+    const caught = attacks.filter((c) => c.verdict !== "verified").length;
+    const fooled = attacks.filter((c) => fin(c.face_similarity) != null && c.face_similarity >= PASS_MARK).length;
+
+    $("nAttacks").textContent = attacks.length;
+    $("nCaught").textContent = caught;
+    $("nFooled").textContent = fooled;
+    $("stats").hidden = false;
+    $("lede").textContent = attacks.length
+      ? "Every attack below wore the enrolled person's face in real time using a free, open-source face-swap model."
+      : "No attacks have been recorded yet. Run one with attack/live.py --serve and the app's ?inject mode.";
+    $("attackCount").textContent = attacks.length ? `${caught} of ${attacks.length} caught` : "";
+    const passed = real.filter((c) => c.verdict === "verified").length;
+    $("realCount").textContent = real.length ? `${passed} of ${real.length} passed` : "";
+    fill($("attackGrid"), attacks, true);
+    fill($("realGrid"), real, false);
+  }
+  load();
+})();
+</script>
+</body>
+</html>

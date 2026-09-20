@@ -23,9 +23,9 @@ const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
 const S = {
   step: "home", enrolling: false, request: null, challenge: null,
   stream: null, track: null, selfie: null, selfieTs: null, exposureLocked: false, tsSource: "now",
+  tracker: { ready: false, on: false, raf: null, last: null, lostAt: null, goodSince: null, anchor: null, phase: null },
   transit: { on: false, blobs: [], ts: [], timer: null },
   frames: { on: false, blobs: [], ts: [], pending: [] },
-  eye: { on: false, raf: null, last: null, closeSince: null, lostSince: null },
   aborted: null,
 };
 
@@ -144,7 +144,7 @@ async function openCamera() {
 }
 
 function closeCamera() {
-  stopEyeTracking();
+  stopTracking();
   stopTransit();
   S.frames.on = false;
   if (S.stream) S.stream.getTracks().forEach((t) => t.stop());
@@ -198,12 +198,13 @@ function stopTransit() {
 // Full-resolution frames with capture timestamps, for the flash sequence.
 function startFrames() {
   const F = S.frames;
-  F.blobs = []; F.ts = []; F.pending = []; F.on = true;
+  F.blobs = []; F.ts = []; F.pending = []; F.eyes = []; F.on = true;
   const ctx = full.getContext("2d");
   const hasRVFC = "requestVideoFrameCallback" in HTMLVideoElement.prototype;
   const take = (ts) => {
     const i = F.ts.length;
     F.ts.push(ts);
+    F.eyes[i] = trackFrame();          // where the eye was on this frame
     ctx.drawImage(video, 0, 0);
     F.pending.push(new Promise((res) => full.toBlob((b) => { F.blobs[i] = b; res(); }, "image/jpeg", 0.9)));
   };
@@ -228,16 +229,37 @@ function startFrames() {
   }
 }
 
-// ---------- live eye tracking ----------
+// ---------- live face + eye tracking ----------
 //
-// The ring follows the eye instead of the eye having to find the ring. We track the
-// corneal glint (the screen's own reflection), measure the iris around it, and start the
-// check by itself once the eye is close enough and holding still. Every genuine failure
-// so far has been a positioning failure ("lean in closer"), not a detection failure.
+// The ring follows the eye instead of the person chasing a fixed outline, and the check
+// runs itself: the selfie fires when the face is framed and still, the flashes start when
+// the eye is close enough and steady. Every genuine rejection so far was a positioning
+// failure ("lean in closer", wrong reflection position), never a detection failure.
+//
+// Tracking is an upgrade, never a requirement: if track.js fails to load, or the tracker
+// finds no face, the shutter and "I'm in position" buttons still drive the same flow.
 
 const IRIS_MM = 11.7;
-const READY_HOLD_S = 0.7;        // eye must stay close and found for this long
-const LOST_GRACE_S = 1.2;        // keep the last ring this long before giving up on tracking
+const HOLD_S = 0.6;                 // how long a good pose must hold before it fires
+const LOST_GRACE_S = 0.9;           // keep the last ring this long after losing the face
+const SELFIE_MIN_FACE = 0.32;       // face height as a fraction of frame: "fills the outline"
+const STEADY_PX = 22;               // allowed movement while holding, in video px
+const AUTO_MAX_DIST_MM = 230;       // start the flashes at or inside this
+const NUDGE_DIST_MM = 300;          // beyond this, ask them to come closer
+
+function trackerReady() { return !!(window.InHumanTracker && S.tracker.ready); }
+
+function stopTracking() {
+  const T = S.tracker;
+  T.on = false;
+  if (T.raf) cancelAnimationFrame(T.raf);
+  T.raf = null;
+  T.last = T.lostAt = T.goodSince = T.anchor = null;
+  T.phase = null;
+  const ring = $("ring");
+  ring.classList.remove("tracked", "near");
+  $("hud").hidden = true;
+}
 
 /** Video pixels -> CSS px in the mirrored, object-fit:cover viewfinder. */
 function videoToCss(x, y) {
@@ -247,86 +269,97 @@ function videoToCss(x, y) {
            y: (y - vh / 2) * scale + innerHeight / 2, scale };
 }
 
-/** Iris radius in video px at the target distance. */
-function targetIrisPx() {
-  const pxPerMM = video.videoWidth / (2 * TARGET_DISTANCE_MM * Math.tan((ASSUMED_FOV_DEG * Math.PI) / 360));
-  return (IRIS_MM / 2) * pxPerMM;
+function setHud(state, main, sub) {
+  const h = $("hud");
+  h.hidden = false;
+  h.className = "hud " + state;
+  $("hudMain").textContent = main;
+  $("hudSub").textContent = sub || "";
 }
 
-// The tracker measures the whole dark eye region, not the iris alone, so it reads high.
-// Calibrated on captures with a known distance: 147 mm (the furthest that still produced a
-// clean check) came out at 4.5x the target iris radius, 118 mm at 7.6x.
-const CLOSE_ENOUGH = 4.0;
-function isClose(r) { return r >= CLOSE_ENOUGH * targetIrisPx(); }
+/** One tracking pass. `phase` is "selfie" or "close". */
+function startTracking(phase) {
+  const T = S.tracker;
+  stopTracking();
+  if (!trackerReady()) return;                 // buttons remain the way through
+  T.on = true; T.phase = phase;
+  const ring = $("ring"), guide = $("guide");
 
-function stopEyeTracking() {
-  S.eye.on = false;
-  if (S.eye.raf) cancelAnimationFrame(S.eye.raf);
-  S.eye.raf = null;
-  S.eye.last = S.eye.closeSince = S.eye.lostSince = null;
-  $("ring").classList.remove("tracked", "near");
-}
-
-function startEyeTracking() {
-  const E = S.eye;
-  E.on = true; E.last = null; E.closeSince = null; E.lostSince = null;
-  const ring = $("ring"), want = targetIrisPx();
   const tick = () => {
-    if (!E.on || S.step !== "camera") return;
-    let eye = null;
-    try { eye = window.findEye(video); } catch { /* tracking is optional; the button still works */ }
+    if (!T.on || S.step !== "camera") return;
+    let r = null;
+    try { r = window.InHumanTracker.track(video, video.videoWidth, video.videoHeight); }
+    catch { /* a bad frame is not a failure */ }
     const t = now();
-    if (eye) {
-      E.lostSince = null;
-      // Smooth so the ring doesn't jitter, but follow a real move quickly.
-      E.last = E.last ? { x: 0.6 * E.last.x + 0.4 * eye.x, y: 0.6 * E.last.y + 0.4 * eye.y,
-                          r: 0.7 * E.last.r + 0.3 * eye.r } : eye;
-    } else if (E.last && E.lostSince == null) {
-      E.lostSince = t;
+    if (r) {
+      T.lostAt = null;
+      T.last = T.last
+        ? { eye: { x: 0.55 * T.last.eye.x + 0.45 * r.eye.x, y: 0.55 * T.last.eye.y + 0.45 * r.eye.y,
+                   r: 0.7 * T.last.eye.r + 0.3 * r.eye.r },
+            box: r.box, mm: 0.7 * T.last.mm + 0.3 * r.distanceMM(ASSUMED_FOV_DEG) }
+        : { eye: r.eye, box: r.box, mm: r.distanceMM(ASSUMED_FOV_DEG) };
+    } else if (T.last && T.lostAt == null) {
+      T.lostAt = t;
     }
-    const show = E.last && (!E.lostSince || t - E.lostSince < LOST_GRACE_S);
-    if (show) {
-      const { x, y, scale } = videoToCss(E.last.x, E.last.y);
-      const d = 2 * (E.last.r / 3.0) * scale;   // draw at about iris size
-      ring.style.transform = `translate(-50%, -50%)`;
-      ring.style.left = `${x}px`;
-      ring.style.top = `${y}px`;
-      ring.style.width = ring.style.height = `${d}px`;
-      ring.classList.add("tracked");
-      const close = isClose(E.last.r);
-      ring.classList.toggle("near", close);
-      if (close && !E.lostSince) {
-        if (E.closeSince == null) E.closeSince = t;
-        const held = t - E.closeSince;
-        setBanner(held >= READY_HOLD_S ? "hold" : "steady");
-        if (held >= READY_HOLD_S) { stopEyeTracking(); ready(); return; }
+    const have = T.last && (!T.lostAt || t - T.lostAt < LOST_GRACE_S);
+
+    if (!have) {
+      T.goodSince = T.anchor = null;
+      ring.classList.remove("tracked", "near");
+      setHud("hunting", phase === "selfie" ? "Show your face" : "Bring one eye to the camera",
+             "Looking for you");
+      T.raf = requestAnimationFrame(tick);
+      return;
+    }
+
+    const { eye, box, mm } = T.last;
+    const moved = T.anchor ? Math.hypot(eye.x - T.anchor.x, eye.y - T.anchor.y) : 0;
+    if (!T.anchor || moved > STEADY_PX) { T.anchor = { x: eye.x, y: eye.y }; T.goodSince = null; }
+
+    if (phase === "selfie") {
+      ring.classList.remove("tracked", "near");
+      const fill = box.h / video.videoHeight;
+      guide.classList.toggle("locked", fill >= SELFIE_MIN_FACE);
+      if (fill < SELFIE_MIN_FACE) {
+        T.goodSince = null;
+        setHud("hunting", "Closer", `${Math.round(mm)} mm away`);
       } else {
-        E.closeSince = null;
-        setBanner("closer");
+        if (T.goodSince == null) T.goodSince = t;
+        const held = t - T.goodSince;
+        setHud("good", held >= HOLD_S ? "Hold it" : "Hold still", `${Math.round(mm)} mm away`);
+        if (held >= HOLD_S) { stopTracking(); shutter(); return; }
       }
     } else {
-      E.closeSince = null;
-      ring.classList.remove("tracked", "near");
-      ring.style.left = ring.style.top = "50%";
-      ring.style.width = ring.style.height = `${2 * want * Math.max(innerWidth / video.videoWidth, innerHeight / video.videoHeight)}px`;
-      setBanner("find");
+      // Ring drawn at true iris size, sitting on the eye.
+      const { x, y, scale } = videoToCss(eye.x, eye.y);
+      ring.style.left = `${x}px`;
+      ring.style.top = `${y}px`;
+      ring.style.width = ring.style.height = `${2 * eye.r * scale}px`;
+      ring.classList.add("tracked");
+      const close = mm <= AUTO_MAX_DIST_MM;
+      ring.classList.toggle("near", close);
+      if (!close) {
+        T.goodSince = null;
+        setHud(mm > NUDGE_DIST_MM ? "hunting" : "warn", "Closer", `${Math.round(mm)} mm — come to about 170`);
+      } else {
+        if (T.goodSince == null) T.goodSince = t;
+        const held = t - T.goodSince;
+        setHud("good", held >= HOLD_S ? "Starting" : "Hold still", `${Math.round(mm)} mm — locked on your eye`);
+        if (held >= HOLD_S) { stopTracking(); ready(); return; }
+      }
     }
-    E.raf = requestAnimationFrame(tick);
+    T.raf = requestAnimationFrame(tick);
   };
-  E.raf = requestAnimationFrame(tick);
+  T.raf = requestAnimationFrame(tick);
 }
 
-const BANNERS = {
-  find: ["Bring one eye toward the camera", "Looking for your eye. Keep the camera on your face."],
-  closer: ["Closer", "Keep coming until the ring locks on."],
-  steady: ["Hold still", "Almost there."],
-  hold: ["Got it", "Starting the check. Keep your eye right there."],
-};
-function setBanner(key) {
-  if (S.eye.banner === key) return;
-  S.eye.banner = key;
-  const [a, b] = BANNERS[key];
-  $("camBanner").innerHTML = `<b>${a}</b>${b}<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
+/** Eye position per frame during the flashes, so the server never has to hunt for it. */
+function trackFrame() {
+  if (!trackerReady()) return null;
+  try {
+    const r = window.InHumanTracker.track(video, video.videoWidth, video.videoHeight);
+    return r ? [Math.round(r.eye.x), Math.round(r.eye.y), Math.round(r.eye.r * 10) / 10] : null;
+  } catch { return null; }
 }
 
 // ---------- the flow ----------
@@ -338,23 +371,19 @@ function cameraMode(mode) {
   $("btnShutter").hidden = !selfie;
   $("btnReady").hidden = selfie;
   $("countdown").hidden = true;
-  // Ring the size an iris (11.7 mm) appears at the target distance. The video is shown
-  // object-fit: cover, so CSS px per video px is the larger of the two axis ratios.
   const ring = $("ring");
   ring.hidden = selfie;
   if (!selfie) {
+    // Starting size: an iris (11.7 mm) at the target distance. Tracking takes over from here.
     const pxPerMM = video.videoWidth / (2 * TARGET_DISTANCE_MM * Math.tan((ASSUMED_FOV_DEG * Math.PI) / 360));
     const cssPerPx = Math.max(innerWidth / video.videoWidth, innerHeight / video.videoHeight);
-    ring.style.width = ring.style.height = `${11.7 * pxPerMM * cssPerPx}px`;
+    ring.style.left = ring.style.top = "50%";
+    ring.style.width = ring.style.height = `${IRIS_MM * pxPerMM * cssPerPx}px`;
   }
-  if (selfie) {
-    stopEyeTracking();
-    $("camBanner").innerHTML = `<b>${S.enrolling ? "Enroll: take a selfie" : "Take a selfie"}</b>Lean in until your face fills the outline.`;
-  } else {
-    S.eye.banner = null;
-    setBanner("find");
-    startEyeTracking();
-  }
+  $("camBanner").innerHTML = selfie
+    ? `<b>${S.enrolling ? "Enroll: look at the camera" : "Look at the camera"}</b>${trackerReady() ? "The photo takes itself once your face fills the outline." : "Lean in until your face fills the outline."}`
+    : `<b>Bring one eye to the camera</b>${trackerReady() ? "The ring follows your eye. The check starts on its own." : "Lean in until the colored part of one eye fills the ring."}<small>The move is being watched. Looking away, covering the camera or switching tabs cancels the check.</small>`;
+  startTracking(selfie ? "selfie" : "close");
 }
 
 async function begin(enrolling) {
@@ -495,6 +524,8 @@ async function upload(events) {
     distance_mm: TARGET_DISTANCE_MM, imu: [], haptics: [],
     session: { selfie_ts: S.selfieTs, challenge_start_ts: events[0]?.ts ?? 0, interruptions: 0 },
     transit_ts: T.ts.filter((_, i) => T.blobs[i]),
+    // Client-side eye track, one entry per frame: [x, y, iris_radius] in video px, or null.
+    eye_track: F.eyes,
   };
 
   const fd = new FormData();
@@ -529,7 +560,16 @@ function reset() {
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   S.request = S.challenge = S.selfie = S.selfieTs = null;
   setTimeout(() => (S.aborted = null), 0);
-  show("home");
+  // Load the face tracker in the background. Everything works without it.
+(function initTracker() {
+  const go = () => window.InHumanTracker.init()
+    .then(() => { S.tracker.ready = true; })
+    .catch(() => { S.tracker.ready = false; });
+  if (window.InHumanTracker) go();
+  else addEventListener("inhuman-tracker-loaded", go, { once: true });
+})();
+
+show("home");
 }
 
 // ---------- wiring ----------
@@ -581,6 +621,15 @@ async function openReplay() {
     return true;
   } catch (e) { toast(e.message); return false; }
 }
+
+// Load the face tracker in the background. Everything works without it.
+(function initTracker() {
+  const go = () => window.InHumanTracker.init()
+    .then(() => { S.tracker.ready = true; })
+    .catch(() => { S.tracker.ready = false; });
+  if (window.InHumanTracker) go();
+  else addEventListener("inhuman-tracker-loaded", go, { once: true });
+})();
 
 show("home");
 openReplay().then((replayed) => { if (!replayed) openLinkedRequest().then(poll); });
